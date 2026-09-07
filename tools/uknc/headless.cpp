@@ -37,6 +37,19 @@ extern "C" {
 }
 extern CMotherboard* g_pBoard;
 extern uint32_t m_dwEmulatorUptime;
+// Крючок на чтение памяти (правка Memory.cpp в build.sh): им ловится, откуда
+// машина берёт начертание знака.
+extern void (*g_readHook)(const void*, uint16_t, int);
+
+static const void* g_watchCtl = 0;
+static bool g_watchOn = false;
+static std::vector<unsigned char> g_readMap;   // 65536 адресов: читался или нет
+
+static void ReadHook(const void* ctl, uint16_t addr, int addrtype)
+{
+    if (!g_watchOn || ctl != g_watchCtl) return;
+    g_readMap[addr] = 1;
+}
 
 // Позиционное соответствие клавиш PC и УКНЦ, латинский регистр.
 // Таблица перенесена из ukncbtl/emulator/ScreenView.cpp (arrPcscan2UkncscanLat),
@@ -423,6 +436,84 @@ int main(int argc, char** argv)
         {
             if (LoadState(rest.c_str())) fprintf(stderr, "состояние загружено: %s\n", rest.c_str());
             else fprintf(stderr, "не загрузилось состояние %s\n", rest.c_str());
+        }
+        else if (cmd == "peekppu")
+        {
+            unsigned addr = 0; int count = 12;
+            sscanf(rest.c_str(), "%o %d", &addr, &count);
+            CMemoryController* ctl = g_pBoard->GetPPUMemoryController();
+            fprintf(stderr, "ПП %06o:", addr);
+            for (int i = 0; i < count; i += 2)
+            {
+                int type = 0;
+                uint16_t v = ctl->GetWordView((uint16_t)(addr + i), false, false, &type);
+                fprintf(stderr, " %02x %02x", v & 0xFF, (v >> 8) & 0xFF);
+            }
+            int type = 0;
+            ctl->GetWordView((uint16_t)addr, false, false, &type);
+            fprintf(stderr, "   (тип памяти %d)\n", type);
+        }
+        else if (cmd == "dumpcpu")
+        {
+            // Слепок адресного пространства ЦП: им проверяется, видно ли оттуда
+            // таблицу знакогенератора периферийного процессора.
+            FILE* fp = fopen(rest.c_str(), "wb");
+            if (fp == NULL) { fprintf(stderr, "не открылся %s\n", rest.c_str()); }
+            else
+            {
+                CMemoryController* ctl = g_pBoard->GetCPUMemoryController();
+                for (int addr = 0; addr < 65536; addr += 2)
+                {
+                    int type = 0;
+                    uint16_t v = ctl->GetWordView((uint16_t)addr, false, false, &type);
+                    fputc(v & 0xFF, fp); fputc((v >> 8) & 0xFF, fp);
+                }
+                fclose(fp);
+                fprintf(stderr, "слепок ЦП -> %s\n", rest.c_str());
+            }
+        }
+        else if (cmd == "pokeppu")
+        {
+            // pokeppu <адрес восьмеричный> <байты через пробел, шестнадцатеричные>
+            unsigned addr = 0; int used = 0;
+            if (sscanf(rest.c_str(), "%o %n", &addr, &used) != 1) { fprintf(stderr, "нужен адрес\n"); continue; }
+            CMemoryController* ctl = g_pBoard->GetPPUMemoryController();
+            const char* q = rest.c_str() + used;
+            unsigned byte; int n = 0, offset = 0;
+            while (sscanf(q, "%x%n", &byte, &n) == 1)
+            {
+                ctl->SetByte((uint16_t)(addr + offset), false, (uint8_t)byte);
+                offset++; q += n;
+            }
+            fprintf(stderr, "записано байт: %d по адресу %06o\n", offset, addr);
+        }
+        else if (cmd == "watchreads")
+        {
+            // watchreads <cpu|ppu> <файл>: включает запись адресов, которые
+            // читает выбранный процессор, до команды stopreads
+            char who[16] = {0};
+            sscanf(rest.c_str(), "%15s", who);
+            g_readMap.assign(65536, 0);
+            g_watchCtl = (strcmp(who, "ppu") == 0)
+                ? (const void*)g_pBoard->GetPPUMemoryController()
+                : (const void*)g_pBoard->GetCPUMemoryController();
+            g_readHook = ReadHook;
+            g_watchOn = true;
+            fprintf(stderr, "слежу за чтениями %s\n", who);
+        }
+        else if (cmd == "stopreads")
+        {
+            g_watchOn = false;
+            FILE* fp = fopen(rest.c_str(), "wb");
+            if (fp == NULL) { fprintf(stderr, "не открылся %s\n", rest.c_str()); }
+            else
+            {
+                fwrite(&g_readMap[0], 1, g_readMap.size(), fp);
+                fclose(fp);
+                long count = 0;
+                for (size_t i = 0; i < g_readMap.size(); i++) count += g_readMap[i];
+                fprintf(stderr, "прочитанных адресов: %ld -> %s\n", count, rest.c_str());
+            }
         }
         else if (cmd == "dumpram")
         {
