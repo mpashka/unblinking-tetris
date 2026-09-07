@@ -18,6 +18,22 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "web" / "template.html"
 OUT = ROOT / "web" / "tetris-uknc.html"
+SITE = ROOT / "web" / "site" / "index.html"
+
+# Артефакт claude.ai оборачивает страницу в свой каркас сам, поэтому в OUT лежит
+# только содержимое. Отдельному веб-серверу каркас никто не дописывает: без
+# объявления кодировки браузер угадывает её сам и показывает кракозябры вместо
+# кириллицы. Поэтому вторым файлом собирается самостоятельная страница.
+SKELETON = """<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{head}</head>
+<body>
+{body}</body>
+</html>
+"""
 FONT = ROOT / "tools" / "uknc" / "font.json"
 FONT_SHOT = ROOT / "build" / "uknc" / "font.ppm"
 
@@ -54,7 +70,14 @@ def main():
     page = page.replace("@@PROG_CLASSIC@@", (ROOT / "src" / "TETRISC.BAS").read_text().rstrip())
     page = page.replace("@@FONT@@", font_hex())
     OUT.write_text(page)
-    print(f"{OUT} — {len(page) // 1024} КБ")
+
+    # Разделение простое: <title>, <link> и <style> — это голова, остальное тело.
+    head_end = page.index("</style>") + len("</style>")
+    site = SKELETON.format(head=page[:head_end] + "\n", body=page[head_end:].lstrip("\n"))
+    SITE.parent.mkdir(parents=True, exist_ok=True)
+    SITE.write_text(site, encoding="utf-8")
+    print(f"{OUT} — {len(page) // 1024} КБ (артефакт)")
+    print(f"{SITE} — {len(site) // 1024} КБ (самостоятельная страница)")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,8 @@
 //
 // Команды скрипта:
 //   frames N        прокрутить N кадров (кадр = 1/25 секунды машинного времени)
-//   key NAME        нажать и отпустить клавишу (ENTER, SPACE, ESC, LEFT, ...)
+//   key NAME        нажать и отпустить клавишу (ENTER, SPACE, ESC, LEFT, ...);
+//                   служебные клавиши УКНЦ по надписи: UST, POM, ISP, SBROS, K1..K5
 //   type ТЕКСТ      набрать строку (без перевода строки)
 //   line ТЕКСТ      набрать строку и нажать ENTER
 //   file ПУТЬ       набрать файл построчно, каждая строка с ENTER
@@ -118,6 +119,32 @@ static bool AsciiToKey(char ch, KeyStroke& out)
     if (ch >= 'a' && ch <= 'z') { out.vk = ch - 'a' + 'A'; return true; }
     if (ch >= '0' && ch <= '9') { out.vk = ch; return true; }
     if (ch == ' ') { out.vk = 0x20; return true; }
+    return false;
+}
+
+// Служебные клавиши самой машины: у них нет соответствия на PC-клавиатуре,
+// поэтому они называются по надписи на клавише и шлются кодом УКНЦ напрямую.
+struct UkncKey { const char* name; unsigned char scan; };
+static const UkncKey UKNC_KEYS[] =
+{
+    { "UST", 0152 },      // УСТ — системное меню «установка режимов»
+    { "POM", 0172 },      // ПОМ
+    { "ISP", 0151 },      // ИСП
+    { "SBROS", 0171 },    // СБРОС
+    { "AR2", 0006 },      // АР2
+    { "GRAF", 0066 },     // ГРАФ
+    { "ALF", 0106 },      // АЛФ
+    { "FIKS", 0107 },     // ФИКС
+    { "UPR", 0046 },      // УПР
+    { "K1", 0010 }, { "K2", 0011 }, { "K3", 0012 }, { "K4", 0014 }, { "K5", 0015 },
+};
+
+static bool NamedUkncKey(const std::string& name, unsigned char& scan)
+{
+    for (size_t i = 0; i < sizeof(UKNC_KEYS) / sizeof(UKNC_KEYS[0]); i++)
+    {
+        if (name == UKNC_KEYS[i].name) { scan = UKNC_KEYS[i].scan; return true; }
+    }
     return false;
 }
 
@@ -371,7 +398,12 @@ int main(int argc, char** argv)
         std::string rest = (space == std::string::npos) ? "" : line.substr(space + 1);
         if (cmd == "frames") RunFrames(atoi(rest.c_str()));
         else if (cmd == "delay") g_charDelay = atoi(rest.c_str());
-        else if (cmd == "key") { int vk = NamedKey(rest); if (vk) PressKey(vk, false); else fprintf(stderr, "нет клавиши %s\n", rest.c_str()); }
+        else if (cmd == "key")
+        {
+            unsigned char scan = 0;
+            if (NamedUkncKey(rest, scan)) PressScan(scan, false);
+            else { int vk = NamedKey(rest); if (vk) PressKey(vk, false); else fprintf(stderr, "нет клавиши %s\n", rest.c_str()); }
+        }
         else if (cmd == "raw") { unsigned scan = 0; int shift = 0; sscanf(rest.c_str(), "%o %d", &scan, &shift); PressScan((unsigned char)scan, shift != 0); }
         else if (cmd == "type") TypeText(rest);
         else if (cmd == "line") { TypeText(rest); PressKey(0x0D, false); }
