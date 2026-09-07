@@ -379,8 +379,9 @@
     <p class="charset-note">Все 224 печатных знака из ПЗУ машины: 32-127 латиница и знаки,
       128-159 стрелки и служебные, 160-191 псевдографика, 192-255 кириллица. Выбранный знак
       сразу подставляется в программу — строка <code>CB$</code>.
-      Квадрата в наборе нет: знак <b>127</b> здесь переопределён — на машине это делалось
-      подменой указателя в таблице знакогенератора.</p>
+      Квадрата в наборе нет: знаки <b>127</b> (полый квадрат) и <b>143</b> (сплошной блок,
+      им выложен стакан) здесь дорисованы. На машине это делалось редактором шрифта с
+      системной дискеты — знакогенератор готовился до запуска программы.</p>
     <canvas id="charset" width="416" height="364" aria-label="Таблица знаков УКНЦ"></canvas>
     <p class="msg" id="charset-msg">Сейчас клетка стакана — знак 79 (полый квадрат).</p>
   </details>
@@ -1685,6 +1686,11 @@ for (let i = 0; i < FONT.length; i++) FONT[i] = parseInt(FONT_HEX.substr(i * 2, 
    POKE центрального процессора этой памяти не видит (проверено). */
 const SQUARE = [0x00, 0x7e, 0x42, 0x42, 0x42, 0x42, 0x42, 0x7e];
 for (let i = 0; i < 8; i++) FONT[(127 - 32) * 8 + i] = SQUARE[i];
+/* Знак 143 — сплошной блок: им выложен стакан. Рисуется во всю клетку, а не в
+   восемь строк начертания: настоящий знак и есть 11 строк, столько же, сколько
+   в знакоместе. */
+const SOLID = 143;
+for (let i = 0; i < 8; i++) FONT[(SOLID - 32) * 8 + i] = 0xFF;
 
 const COLS = 64, ROWS = 24, CW = 8, CHH = 11, GH = 8;
 
@@ -2313,7 +2319,13 @@ function sourceFor(name) {
   return SOURCES[name]
     .replace(/^105 CW%=\d+$/m, "105 CW%=" + (wide ? 1 : 2))
     .replace(/^(\d+) CB\$=.*$/m, "$1 CB$=CHR$(" + cellCode + ")+\" \"")
-    .replace(/^(\d+) IF CW%=1 THEN CB\$=.*$/m, "$1 IF CW%=1 THEN CB$=CHR$(" + cellCode + ")");
+    .replace(/^(\d+) IF CW%=1 THEN CB\$=.*$/m, "$1 IF CW%=1 THEN CB$=CHR$(" + cellCode + ")")
+    // Стены, пол и углы — один сплошной знак: на машине его надо сперва
+    // нарисовать редактором шрифта, здесь он уже есть.
+    .replace(/CHR\$\(164\)/g, "CHR$(143)")
+    .replace(/CHR\$\(186\)/g, "CHR$(143)")
+    .replace(/CHR\$\(166\)/g, "CHR$(143)")
+    .replace(/CHR\$\(161\)/g, "CHR$(143)");
 }
 
 function boot() {
@@ -2349,6 +2361,31 @@ function updateCounters(force) {
   lastCounters = [drawn, erased];
 }
 
+/* --------------------------------------------------- клетки живой фигуры */
+/* Игра держит текущую фигуру в CT/CR/CX/CY и таблицах SX/TY — по ним видно,
+   какие знакоместа сейчас «живые». Прилипшие клетки этим набором не покрыты,
+   поэтому и рисуются тусклее. */
+function activeCells() {
+  const set = new Set();
+  try {
+    const t = machine.getVar("CT%");
+    if (!t || t < 1 || t > 7) return set;
+    if (!machine.running) return set;
+    const r = machine.getVar("CR%"), x = machine.getVar("CX%"), y = machine.getVar("CY%");
+    const bx = machine.getVar("BX%"), by = machine.getVar("BY%"), cw = machine.getVar("CW%") || 2;
+    const si = (t - 1) * 4 + r;
+    for (let i = 0; i < 4; i++) {
+      const col = bx + (x + machine.getArray("SX%", [si, i])) * cw;
+      const row = by + y + machine.getArray("TY%", [si, i]);
+      if (row < 0 || row >= ROWS) continue;
+      for (let k = 0; k < cw; k++) {
+        if (col + k >= 0 && col + k < COLS) set.add(row * COLS + col + k);
+      }
+    }
+  } catch (err) { /* до первой фигуры переменных ещё нет */ }
+  return set;
+}
+
 /* ------------------------------------------------------------- отрисовка */
 function draw() {
   const cw = wide ? CW * 2 : CW;
@@ -2357,21 +2394,33 @@ function draw() {
   const img = ctx.createImageData(cols * cw, ROWS * CHH);
   const px = img.data;
   const bg = [11, 12, 12];
-  // Фигурки ярче всего остального: пустота стакана остаётся чёрной, рамка и
-  // панель приглушены, а знак фигуры светится.
-  const inkDim = [176, 184, 186];
-  const inkBright = [255, 255, 255];
+  // Три яркости: живая фигура светится, прилипшие клетки тусклее, рамка и
+  // панель ещё тише. Пустота стакана остаётся чёрной.
+  const inkFrame = [120, 132, 136];
+  const inkLocked = [168, 180, 183];
+  const inkActive = [255, 255, 255];
   const blockChar = machine.getVar("CB$");
   const blockCode = blockChar && blockChar.length ? koi7(blockChar[0]) : -1;
+  const active = activeCells();
   for (let i = 0; i < px.length; i += 4) {
     px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; px[i + 3] = 255;
   }
   const width = cols * cw;
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < cols; col++) {
-      const code = machine.screen.cells[row * COLS + col];
+      const idx = row * COLS + col;
+      const code = machine.screen.cells[idx];
       if (code === 32) continue;
-      const ink = code === blockCode ? inkBright : inkDim;
+      const ink = active.has(idx) ? inkActive : (code === blockCode ? inkLocked : inkFrame);
+      if (code === SOLID) {
+        for (let dy = 0; dy < CHH; dy++) {
+          for (let dx = 0; dx < cw; dx++) {
+            const o = (((row * CHH + dy) * width) + col * cw + dx) * 4;
+            px[o] = ink[0]; px[o + 1] = ink[1]; px[o + 2] = ink[2];
+          }
+        }
+        continue;
+      }
       const g = (code - 32) * 8;
       if (g < 0 || g + 8 > FONT.length) continue;
       for (let dy = 0; dy < GH; dy++) {
