@@ -1,0 +1,12 @@
+# Набрать программу и сохранить состояние машины: его понимают и UKNCBTL,
+# и браузерная сборка (параметр state= в адресе).
+frames 150
+key 2
+frames 30
+key ENTER
+frames 250
+delay 2
+file T.BAS
+frames 60
+save ../tetris-uknc.uknc
+shot state.ppm

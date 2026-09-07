@@ -1,31 +1,38 @@
-"""Интерпретатор подмножества УКНЦ-Бейсика — headless-стенд для TETRIS.BAS.
+"""Интерпретатор подмножества УКНЦ-Бейсика — стенд для TETRIS.BAS без машины.
 
-Он нужен не как эмулятор УКНЦ, а как способ прогнать игровую логику и
-посчитать графические операции без железа и без GUI-эмулятора. Поэтому он
-намеренно строгий: всё, чего нет в «БЕЙСИК. Описание языка. У1.00031-01 35 01»,
-он не понимает, а имя длиннее двух букв считает ошибкой — на настоящей машине
-значимы только первые две.
+Диалект — кассетный Вильнюс-Бейсик 1988.09.28 из картриджа ПЗУ, тот самый, что
+крутится в эмуляторе. Его свойства сняты опытом на живой машине
+(tools/uknc/headless.cpp, снимки в docs/img/), и интерпретатор намеренно
+строг ровно там же, где строга она:
 
-Модель экрана: 640x264, цвет 0..8, целочисленный буфер. Каждая заливка
-прямоугольника запоминается в журнале операций, чтобы тест мог проверить не
-картинку, а число и адреса изменившихся клеток.
+* **один оператор в строке** — двоеточие как разделитель эта система не знает
+  (Ошибка 2), поэтому `A=1 : B=2` здесь тоже ошибка;
+* **значимы две первые буквы имени** — `SCORE` и `SCREEN` для машины одно и то
+  же, и стенд запоминает каждое имя, которое пришлось обрезать;
+* **графики нет вовсе** — LINE и PSET отвечают Ошибкой 5, поэтому их здесь
+  просто не существует;
+* экран текстовый, 64x24, `LOCATE <столбец>,<строка>` считает от нуля и
+  ругается на выход за 63 и 23;
+* `RND` требует аргумента.
+
+Экран — сетка символов с цветом. Каждый вывод запоминается в журнале, чтобы
+тест проверял не картинку, а какие именно клетки поля изменились.
 """
 
 import math
 import random
 import re
 
-SCREEN_W = 640
-SCREEN_H = 264
-
 KEYWORDS = {
     "REM", "LET", "IF", "THEN", "ELSE", "GOTO", "GOSUB", "RETURN", "FOR", "TO",
     "STEP", "NEXT", "READ", "DATA", "RESTORE", "DIM", "END", "STOP", "PRINT",
-    "SCREEN", "COLOR", "CLS", "LINE", "PSET", "PRESET", "BEEP", "ON", "AND",
-    "OR", "NOT", "B", "BF", "RANDOMIZE",
+    "COLOR", "CLS", "LOCATE", "BEEP", "ON", "AND", "OR", "NOT",
 }
 
-FUNCTIONS = {"INT", "ABS", "RND", "SGN", "ASC", "LEN", "POINT", "SQR", "SIN", "COS"}
+FUNCTIONS = {"INT", "ABS", "RND", "SGN", "ASC", "LEN", "SQR", "CHR", "STRING"}
+
+SCREEN_COLS = 64
+SCREEN_ROWS = 24
 
 TOKEN_RE = re.compile(
     r"""
@@ -93,60 +100,67 @@ class Line:
 
 
 class Screen:
+    """Текстовый экран 64x24: символ и цвет в каждой клетке плюс журнал вывода."""
+
     def __init__(self):
-        self.mode = 0
         self.fg = 7
         self.bg = 0
-        self.pixels = [[0] * SCREEN_W for _ in range(SCREEN_H)]
+        self.col = 0
+        self.row = 0
+        self.cells = [[(" ", 7) for _ in range(SCREEN_COLS)] for _ in range(SCREEN_ROWS)]
         self.ops = []
         self.cls_count = 0
+        self.scrolls = 0
 
     def cls(self):
         self.cls_count += 1
-        for row in self.pixels:
-            for x in range(SCREEN_W):
-                row[x] = self.bg
+        self.cells = [[(" ", self.fg) for _ in range(SCREEN_COLS)] for _ in range(SCREEN_ROWS)]
+        self.col = 0
+        self.row = 0
         self.ops.append(("cls",))
 
-    def _clip(self, x, y):
-        return 0 <= x < SCREEN_W and 0 <= y < SCREEN_H
+    def locate(self, col, row):
+        if not 0 <= col < SCREEN_COLS:
+            raise BasicError(f"LOCATE: столбец {col} вне 0..{SCREEN_COLS - 1}")
+        if not 0 <= row < SCREEN_ROWS:
+            raise BasicError(f"LOCATE: строка {row} вне 0..{SCREEN_ROWS - 1}")
+        self.col = col
+        self.row = row
+        self.ops.append(("locate", col, row))
 
-    def fill(self, x1, y1, x2, y2, color):
-        x1, x2 = sorted((x1, x2))
-        y1, y2 = sorted((y1, y2))
-        self.ops.append(("fill", x1, y1, x2, y2, color))
-        for y in range(max(0, y1), min(SCREEN_H, y2 + 1)):
-            row = self.pixels[y]
-            for x in range(max(0, x1), min(SCREEN_W, x2 + 1)):
-                row[x] = color
+    def write(self, text):
+        if text:
+            self.ops.append(("print", self.col, self.row, text, self.fg))
+        for ch in text:
+            if self.col >= SCREEN_COLS:
+                self.newline()
+            self.cells[self.row][self.col] = (ch, self.fg)
+            self.col += 1
 
-    def draw_line(self, x1, y1, x2, y2, color):
-        self.ops.append(("line", x1, y1, x2, y2, color))
-        dx = abs(x2 - x1)
-        dy = -abs(y2 - y1)
-        sx = 1 if x1 < x2 else -1
-        sy = 1 if y1 < y2 else -1
-        err = dx + dy
-        while True:
-            if self._clip(x1, y1):
-                self.pixels[y1][x1] = color
-            if x1 == x2 and y1 == y2:
-                break
-            e2 = 2 * err
-            if e2 >= dy:
-                err += dy
-                x1 += sx
-            if e2 <= dx:
-                err += dx
-                y1 += sy
+    def newline(self):
+        self.col = 0
+        self.row += 1
+        if self.row >= SCREEN_ROWS:
+            self.scroll()
 
-    def pset(self, x, y, color):
-        self.ops.append(("pset", x, y, color))
-        if self._clip(x, y):
-            self.pixels[y][x] = color
+    def scroll(self):
+        self.scrolls += 1
+        self.cells.pop(0)
+        self.cells.append([(" ", self.fg) for _ in range(SCREEN_COLS)])
+        self.row = SCREEN_ROWS - 1
+        self.ops.append(("scroll",))
 
-    def point(self, x, y):
-        return self.pixels[y][x] if self._clip(x, y) else 0
+    def char_at(self, col, row):
+        return self.cells[row][col][0]
+
+    def color_at(self, col, row):
+        return self.cells[row][col][1]
+
+    def text_at(self, col, row, length):
+        return "".join(self.cells[row][col + i][0] for i in range(length))
+
+    def dump(self):
+        return "\n".join("".join(c for c, _ in row).rstrip() for row in self.cells)
 
 
 class Interpreter:
@@ -189,6 +203,12 @@ class Interpreter:
             if len(raw) > 255:
                 raise BasicError(f"строка {number} длиннее 255 символов")
             tokens = tokenize(body)
+            for t in tokens:
+                if t.kind == "op" and t.text == ":":
+                    raise BasicError(
+                        f"строка {number}: двоеточие — кассетный БЕЙСИК не знает "
+                        f"разделителя операторов, нужен один оператор в строке"
+                    )
             if number in self.index:
                 raise BasicError(f"повтор номера строки {number}")
             self.index[number] = len(self.lines)
@@ -408,6 +428,8 @@ class Interpreter:
         if i < len(toks) and toks[i].text == "(":
             args, i = self._index_list_raw(toks, i)
         if base == "RND":
+            if not args:
+                raise BasicError("RND без аргумента — эта система требует RND(X)")
             return self.rng.random(), i
         if base == "INT":
             return math.floor(args[0]), i
@@ -427,8 +449,10 @@ class Interpreter:
             return math.sin(args[0]), i
         if base == "COS":
             return math.cos(args[0]), i
-        if base == "POINT":
-            return self.screen.point(int(args[0]), int(args[1])), i
+        if base == "CHR":
+            return chr(int(args[0])), i
+        if base == "STRING":
+            return str(args[1]) * int(args[0]), i
         raise BasicError(f"нет функции {base}")
 
     def _index_list_raw(self, toks, i):
@@ -558,12 +582,6 @@ class Interpreter:
             return self._restore(toks, i + 1, li)
         if word == "PRINT":
             return self._print(toks, i + 1, li)
-        if word == "SCREEN":
-            val, j = self.eval_expr(toks, i + 1)
-            self.screen.mode = int(val)
-            self.screen.cls()
-            self._skip_separator(toks, j, li)
-            return None
         if word == "COLOR":
             return self._color(toks, i + 1, li)
         if word == "CLS":
@@ -574,16 +592,8 @@ class Interpreter:
             self.beeps += 1
             self._skip_separator(toks, i + 1, li)
             return None
-        if word == "RANDOMIZE":
-            j = i + 1
-            if j < len(toks) and toks[j].text not in (":", ";"):
-                _, j = self.eval_expr(toks, j)
-            self._skip_separator(toks, j, li)
-            return None
-        if word == "LINE":
-            return self._line(toks, i + 1, li)
-        if word in ("PSET", "PRESET"):
-            return self._pset(toks, i + 1, li, word == "PRESET")
+        if word == "LOCATE":
+            return self._locate(toks, i + 1, li)
         if t.kind == "name":
             return self._assign(toks, i, li)
         raise BasicError(f"неизвестный оператор {t.text!r}")
@@ -787,17 +797,40 @@ class Interpreter:
         self._skip_separator(toks, j, li)
         return None
 
+    @staticmethod
+    def format_value(value):
+        if isinstance(value, str):
+            return value
+        if value == int(value):
+            text = str(int(value))
+        else:
+            text = repr(round(value, 6))
+        return (" " + text if value >= 0 else text) + " "
+
     def _print(self, toks, i, li):
-        parts = []
         j = i
-        while j < len(toks) and toks[j].text not in (":",):
-            if toks[j].text in (";", ","):
+        newline = True
+        printed = []
+        while j < len(toks):
+            if toks[j].text == ";":
+                newline = False
                 j += 1
                 continue
-            val, j = self.eval_expr(toks, j)
-            parts.append(val)
-        self.output.append(" ".join(str(p) for p in parts))
-        self._skip_separator(toks, j, li)
+            if toks[j].text == ",":
+                pad = 14 - (self.screen.col % 14)
+                self.screen.write(" " * pad)
+                newline = False
+                j += 1
+                continue
+            value, j = self.eval_expr(toks, j)
+            text = self.format_value(value)
+            printed.append(text)
+            self.screen.write(text)
+            newline = True
+        if newline:
+            self.screen.newline()
+        self.output.append("".join(printed))
+        self.pc = (li + 1, 0)
         return None
 
     def _color(self, toks, i, li):
@@ -822,59 +855,11 @@ class Interpreter:
         self._skip_separator(toks, j, li)
         return None
 
-    def _coords(self, toks, i):
-        if toks[i].text == "@":
-            i += 1
-        if toks[i].text != "(":
-            raise BasicError("ожидались координаты вида @(X,Y)")
-        x, i = self.eval_expr(toks, i + 1)
-        if toks[i].text != ",":
-            raise BasicError("ожидалась , в координатах")
-        y, i = self.eval_expr(toks, i + 1)
-        if toks[i].text != ")":
-            raise BasicError("ожидалась ) в координатах")
-        return int(x), int(y), i + 1
-
-    def _line(self, toks, i, li):
-        x1, y1, j = self._coords(toks, i)
-        if toks[j].text != "-":
-            raise BasicError("ожидалось - между координатами LINE")
-        x2, y2, j = self._coords(toks, j + 1)
-        color = self.screen.fg
-        style = None
-        if j < len(toks) and toks[j].text == ",":
-            j += 1
-            if j < len(toks) and toks[j].text not in (",", "B", "BF", ":"):
-                val, j = self.eval_expr(toks, j)
-                color = int(val)
-            if j < len(toks) and toks[j].text == ",":
-                j += 1
-            if j < len(toks) and toks[j].text in ("B", "BF"):
-                style = toks[j].text
-                j += 1
-        if not 0 <= color <= 8:
-            raise BasicError(f"цвет {color} вне диапазона 0..8")
-        for x, y in ((x1, y1), (x2, y2)):
-            if not (0 <= x < SCREEN_W and 0 <= y < SCREEN_H):
-                raise BasicError(f"координата ({x},{y}) вне экрана 640x264")
-        if style == "BF":
-            self.screen.fill(x1, y1, x2, y2, color)
-        elif style == "B":
-            self.screen.draw_line(x1, y1, x2, y1, color)
-            self.screen.draw_line(x2, y1, x2, y2, color)
-            self.screen.draw_line(x2, y2, x1, y2, color)
-            self.screen.draw_line(x1, y2, x1, y1, color)
-        else:
-            self.screen.draw_line(x1, y1, x2, y2, color)
-        self._skip_separator(toks, j, li)
-        return None
-
-    def _pset(self, toks, i, li, erase):
-        x, y, j = self._coords(toks, i)
-        color = self.screen.bg if erase else self.screen.fg
-        if j < len(toks) and toks[j].text == ",":
-            val, j = self.eval_expr(toks, j + 1)
-            color = int(val)
-        self.screen.pset(x, y, color)
+    def _locate(self, toks, i, li):
+        col, j = self.eval_expr(toks, i)
+        if toks[j].text != ",":
+            raise BasicError("LOCATE ждёт два аргумента: столбец и строку")
+        row, j = self.eval_expr(toks, j + 1)
+        self.screen.locate(int(col), int(row))
         self._skip_separator(toks, j, li)
         return None

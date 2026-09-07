@@ -1,0 +1,25 @@
+# Набрать программу (T.BAS рядом с uknc_run), запустить и поиграть.
+frames 150
+key 2
+frames 30
+key ENTER
+frames 250
+delay 2
+echo -- набираю программу, это пара минут машинного времени
+file T.BAS
+frames 50
+line RUN
+frames 900
+key SPACE
+frames 200
+shot game.ppm
+echo -- три раза влево, поворот, мгновенный сброс
+raw 072 0
+frames 25
+raw 072 0
+frames 25
+raw 071 0
+frames 30
+raw 113 0
+frames 60
+shot after-drop.ppm

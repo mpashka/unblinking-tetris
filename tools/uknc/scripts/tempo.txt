@@ -1,0 +1,17 @@
+# Замер: сколько кадров проходит между шагами гравитации на уровне 0.
+frames 150
+key 2
+frames 30
+key ENTER
+frames 250
+delay 2
+file T.BAS
+frames 50
+line RUN
+frames 900
+key SPACE
+frames 100
+waitregion 89 24 241 233 600
+waitregion 89 24 241 233 600
+waitregion 89 24 241 233 600
+waitregion 89 24 241 233 600

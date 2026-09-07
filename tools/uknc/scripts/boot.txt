@@ -1,0 +1,7 @@
+# Загрузиться с картриджа ПЗУ и показать приглашение Бейсика.
+frames 150
+key 2
+frames 30
+key ENTER
+frames 250
+shot boot.ppm

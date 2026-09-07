@@ -22,8 +22,11 @@ SOURCE = SRC.read_text()
 
 TYPES = {1: "I", 2: "O", 3: "T", 4: "S", 5: "Z", 6: "J", 7: "L"}
 
-LEFT, RIGHT, SOFT, ROTATE, HARD = 3000, 3100, 3200, 4000, 3300
-GRAVITY, LOCK = 3400, 6000
+LEFT, RIGHT, SOFT, ROTATE, HARD = 3000, 3010, 3020, 4000, 3040
+GRAVITY, LOCK = 3100, 6000
+SNAPSHOT, DIFF, AFTER_ACTION = 5000, 5100, 3400
+SPAWN, NEXT_TYPE, SCORE_ROWS = 2000, 2100, 6200
+CONFIG, TITLE, NEW_GAME, MAIN_LOOP, GAME_OVER = 100, 250, 300, 400, 500
 
 
 # --------------------------------------------------------------------- стенд
@@ -32,10 +35,10 @@ GRAVITY, LOCK = 3400, 6000
 def boot(seed=1):
     """Инициализация: конфигурация и таблицы, но без заставки и игры."""
     b = Interpreter(SOURCE, seed=seed)
-    b.run(start_line=200, stop_at={400})
+    b.run(start_line=CONFIG, stop_at={TITLE})
     b.set_var("LV%", 0)
     b.set_var("FL%", 0)
-    b.set_var("SC", 0)
+    b.set_var("SR", 0)
     return b
 
 
@@ -46,7 +49,7 @@ def rots(b, t):
 def shape(b, t, r, x=0, y=0):
     si = (t - 1) * 4 + r
     return {
-        (x + b.get_array("SX%", [si, i]), y + b.get_array("SY%", [si, i]))
+        (x + b.get_array("SX%", [si, i]), y + b.get_array("TY%", [si, i]))
         for i in range(4)
     }
 
@@ -68,7 +71,7 @@ def place(b, t, r, x, y, draw=True):
         for i in range(4):
             b.set_array("AX%", [i], -9)
             b.set_array("AY%", [i], -9)
-        b.call(5100)
+        b.call(DIFF)
     reset_counters(b)
 
 
@@ -83,26 +86,27 @@ def counters(b):
 
 
 def touched(b):
-    """Журнал заливок, переведённый в клетки стакана: (x, y, цвет)."""
-    bx, by, cs, cg = (b.get_var(n) for n in ("BX%", "BY%", "CS%", "CG%"))
+    """Журнал вывода, переведённый в клетки стакана: (x, y, занята ли)."""
+    bx, by = b.get_var("BX%"), b.get_var("BY%")
+    block = b.get_var("CB$")
     out = []
     for op in b.screen.ops:
-        if op[0] != "fill":
+        if op[0] != "print":
             continue
-        _, x1, y1, x2, y2, color = op
-        if (x1 - bx) % cs or (y1 - by) % cs:
+        _, col, row, text, _color = op
+        if text not in (block, "  "):
             continue
-        if x2 - x1 != cs - cg - 1 or y2 - y1 != cs - cg - 1:
+        if (col - bx) % 2:
             continue
-        cx, cy = (x1 - bx) // cs, (y1 - by) // cs
+        cx, cy = (col - bx) // 2, row - by
         if 0 <= cx < b.get_var("BW%") and 0 <= cy < b.get_var("BH%"):
-            out.append((cx, cy, color))
+            out.append((cx, cy, text == block))
     return out
 
 
 def drawn_erased(b):
     cells = touched(b)
-    return ({(x, y) for x, y, c in cells if c}, {(x, y) for x, y, c in cells if not c})
+    return ({(x, y) for x, y, f in cells if f}, {(x, y) for x, y, f in cells if not f})
 
 
 def board(b):
@@ -331,11 +335,11 @@ def t_rotation_blocked():
 def t_hard_drop():
     b = boot()
     place(b, 3, 0, 4, 0)
-    b.set_var("SC", 0)
+    b.set_var("SR", 0)
     b.call(HARD)
     cells = piece_cells(b)
     assert max(y for _, y in cells) == 19, cells
-    assert b.get_var("SC") == 2 * 17 * 1, b.get_var("SC")
+    assert b.get_var("SR") == 2 * 17 * 1, b.get_var("SR")
     assert b.get_var("GR%") == 1, "hard drop не включил grounded"
     assert b.get_var("LK%") == b.get_array("LD%", [0]), "нет окна манёвра"
     assert b.get_var("FL%") == 0
@@ -367,11 +371,11 @@ def t_lock_reset_limit():
     grace = b.get_array("AG%", [0])
     for i in range(limit):
         b.set_var("LK%", 1)
-        b.call(3800)
+        b.call(AFTER_ACTION)
         assert b.get_var("LK%") == full, f"продление {i} не дало полного интервала"
     for _ in range(5):
         b.set_var("LK%", 1)
-        b.call(3800)
+        b.call(AFTER_ACTION)
         assert b.get_var("LR%") == limit, "счётчик продлений пробит"
         assert b.get_var("LK%") == grace, "после лимита выдан полный интервал"
 
@@ -381,9 +385,9 @@ def t_soft_drop_score():
     b = boot()
     b.set_var("LV%", 3)
     place(b, 3, 0, 4, 0)
-    b.set_var("SC", 0)
+    b.set_var("SR", 0)
     b.call(SOFT)
-    assert b.get_var("SC") == 4, b.get_var("SC")
+    assert b.get_var("SR") == 4, b.get_var("SR")
 
 
 @test("удаление 1-4 строк: доска, очки и число линий")
@@ -402,12 +406,12 @@ def t_line_clears():
             model[y][x] = 1
         model = [row for row in model if not all(row)]
         model = [[0] * 10 for _ in range(20 - len(model))] + model
-        b.set_var("SC", 0)
+        b.set_var("SR", 0)
         b.set_var("NT%", 2)
         b.call(LOCK)
         assert b.get_var("NC%") == n, f"{n}: посчитано {b.get_var('NC%')}"
         assert b.get_var("LN%") == n
-        assert b.get_var("SC") == expected[n], f"{n}: очки {b.get_var('SC')}"
+        assert b.get_var("SR") == expected[n], f"{n}: очки {b.get_var('SC')}"
         assert board(b) == model, f"{n}: стакан после удаления разъехался"
 
 
@@ -438,7 +442,7 @@ def t_next_and_spawn():
     b = boot()
     b.set_var("NT%", 5)
     ops_before = len(b.screen.ops)
-    b.call(2000)
+    b.call(SPAWN)
     assert b.get_var("CT%") == 5, "NEXT не стала текущей"
     assert 1 <= b.get_var("NT%") <= 7
     assert len(b.screen.ops) > ops_before, "превью не перерисовано"
@@ -458,7 +462,7 @@ def t_game_over():
             rows[y][x] = 2
     set_board(b, rows)
     b.set_var("NT%", 3)
-    b.call(2000)
+    b.call(SPAWN)
     assert b.get_var("FL%") == 1, "игра не заметила переполнения"
 
 
@@ -467,7 +471,7 @@ def t_levels():
     b = boot()
     b.set_var("LN%", 9)
     b.set_var("NC%", 1)
-    b.call(6500)
+    b.call(SCORE_ROWS)
     assert b.get_var("LN%") == 10 and b.get_var("LV%") == 1
     delays = [b.get_array("GD%", [i]) for i in range(10)]
     assert delays == sorted(delays, reverse=True) and len(set(delays)) == 10, delays
@@ -482,9 +486,9 @@ def t_line_score_level():
     b = boot()
     b.set_var("LV%", 4)
     b.set_var("NC%", 4)
-    b.set_var("SC", 0)
-    b.call(6500)
-    assert b.get_var("SC") == 1000 * 5, b.get_var("SC")
+    b.set_var("SR", 0)
+    b.call(SCORE_ROWS)
+    assert b.get_var("SR") == 1000 * 5, b.get_var("SR")
 
 
 @test("генератор выдаёт все семь фигур без длинных серий")
@@ -492,7 +496,7 @@ def t_randomizer():
     b = boot(seed=7)
     seen = []
     for _ in range(700):
-        b.call(2200)
+        b.call(NEXT_TYPE)
         seen.append(b.get_var("NT%"))
     counts = {t: seen.count(t) for t in range(1, 8)}
     assert set(counts) == set(range(1, 8)), counts
@@ -519,10 +523,10 @@ def t_no_cls():
 def t_main_loop_gravity():
     b = Interpreter(SOURCE, seed=3)
     b.keys.append(" ")
-    b.run(start_line=200, stop_at={500})
+    b.run(start_line=CONFIG, stop_at={MAIN_LOOP})
     settled = b.screen.cls_count
-    b.run(start_line=500, stop_at={6000}, max_steps=2_000_000)
-    assert b.stopped_at == 6000, "фигура так и не зафиксировалась"
+    b.run(start_line=MAIN_LOOP, stop_at={LOCK}, max_steps=2_000_000)
+    assert b.stopped_at == LOCK, "фигура так и не зафиксировалась"
     assert max(y for _, y in piece_cells(b)) == 19, "зафиксировалась не у пола"
     assert b.screen.cls_count == settled, "в игровом цикле сработал CLS"
 
@@ -531,8 +535,8 @@ def t_main_loop_gravity():
 def t_main_loop_quit():
     b = Interpreter(SOURCE, seed=3)
     b.keys.extend([" ", "q"])
-    b.run(start_line=200, stop_at={450})
-    b.run(start_line=450, stop_at={600}, max_steps=2_000_000)
+    b.run(start_line=CONFIG, stop_at={NEW_GAME})
+    b.run(start_line=NEW_GAME, stop_at={GAME_OVER}, max_steps=2_000_000)
     assert b.get_var("FL%") == 2
 
 
@@ -543,27 +547,27 @@ def t_playthrough():
     b = Interpreter(SOURCE, seed=11)
     rnd = random.Random(5)
     b.keys.append(" ")
-    b.run(start_line=200, stop_at={500})
+    b.run(start_line=CONFIG, stop_at={MAIN_LOOP})
     b.keys.extend(rnd.choice("adws ") for _ in range(4000))
-    b.run(start_line=500, stop_at={600}, max_steps=40_000_000)
-    assert b.stopped_at == 600 and b.get_var("FL%") == 1, "партия не завершилась переполнением"
+    b.run(start_line=MAIN_LOOP, stop_at={GAME_OVER}, max_steps=40_000_000)
+    assert b.stopped_at == GAME_OVER and b.get_var("FL%") == 1, "партия не завершилась переполнением"
     assert b.get_var("DC%") > 1000 and b.get_var("EC%") > 1000
     assert abs(b.get_var("DC%") - b.get_var("EC%")) < b.get_var("DC%") * 0.1, (
         "нарисовано и стёрто разошлись: где-то остаются следы фигур"
     )
-    assert b.screen.cls_count == 3, f"экран чистился {b.screen.cls_count} раз"
+    assert b.screen.cls_count == 2, f"экран чистился {b.screen.cls_count} раз"
 
 
 @test("заставка и HUD рисуются без ошибок исполнения")
 def t_ui_smoke():
     b = Interpreter(SOURCE, seed=3)
     b.keys.append(" ")
-    b.run(start_line=200, stop_at={500})
+    b.run(start_line=CONFIG, stop_at={MAIN_LOOP})
     assert b.get_var("CT%") != 0, "первая фигура не появилась"
     assert b.screen.ops, "экран пуст"
 
 
-@test("в таблице клавиш есть и WASD, и раскладка БК 7/9/8/5")
+@test("клавиши: WASD, раскладка БК 7/9/8/5 и стрелки как ESC плюс буква")
 def t_keys():
     b = boot()
     table = {b.get_array("KA%", [i]): b.get_array("KV%", [i]) for i in range(b.get_var("NK%"))}
@@ -571,7 +575,41 @@ def t_keys():
         assert table.get(code) == action, f"код {code}"
     for code, action in ((55, 1), (57, 2), (53, 3), (56, 4)):
         assert table.get(code) == action, f"раскладка БК: код {code}"
-    assert -1 in table, "не осталось места под коды стрелок"
+    # стрелки приходят двумя байтами: 27 и буква. Проверяем оба шага.
+    for letter, action in (("A", 4), ("B", 3), ("C", 2), ("D", 1)):
+        b.set_var("ES%", 0)
+        b.keys.extend([chr(27), letter])
+        b.call(1000)
+        assert b.get_var("AK%") == 0 and b.get_var("ES%") == 1, "ESC не запомнен"
+        b.call(1000)
+        assert b.get_var("AK%") == action, f"стрелка ESC {letter}"
+        assert b.get_var("ES%") == 0
+
+
+@test("мигающий двойник: та же логика, но восемь клеток вместо двух")
+def t_classic():
+    classic = (ROOT / "src" / "TETRISC.BAS").read_text()
+    generated = __import__("make_classic").make_classic(SOURCE)
+    assert classic == generated, (
+        "src/TETRISC.BAS разошёлся с генератором: пересоберите его "
+        "командой python3 tools/make_classic.py > src/TETRISC.BAS"
+    )
+    b = Interpreter(classic, seed=1)
+    b.run(start_line=CONFIG, stop_at={TITLE})
+    b.set_var("LV%", 0)
+    # горизонтальная I: у аккуратной версии 1 и 1, у мигающей 4 и 4
+    place(b, 1, 0, 3, 8)
+    b.call(RIGHT)
+    assert counters(b) == (4, 4), f"мигающая версия должна трогать все клетки: {counters(b)}"
+    # поворот T: у аккуратной версии 1 и 1
+    place(b, 3, 0, 4, 8)
+    b.call(ROTATE)
+    assert counters(b) == (4, 4), counters(b)
+    # но игровая логика та же
+    assert b.get_var("CR%") == 1
+    place(b, 2, 0, 4, 8)
+    b.call(ROTATE)
+    assert counters(b) == (0, 0), "O не вращается, значит и печатать нечего"
 
 
 @test("вспомогательные программы KEYTEST и BENCH разбираются без ошибок")

@@ -1,0 +1,2500 @@
+<title>Тетрис на кассетном Бейсике</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Sans+Narrow:wght@400;700&display=swap">
+<style>
+  :root {
+    --ground: #f2ece5;
+    --panel: #fffaf4;
+    --line: #ddd0c3;
+    --text: #241a12;
+    --muted: #6d5a4b;
+    --accent: #a85c00;
+    --accent-soft: #f6e2c4;
+    --screen-bg: #d81c00;
+    --screen-ink: #ffffff;
+    --bezel: #2a211b;
+    --shadow: 0 1px 2px rgba(36, 26, 18, .10), 0 8px 24px rgba(36, 26, 18, .08);
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #17130f;
+      --panel: #211a15;
+      --line: #3a2c23;
+      --text: #ece2d8;
+      --muted: #a3877a;
+      --accent: #ffb020;
+      --accent-soft: #3a2a15;
+      --bezel: #0d0a08;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #17130f;
+    --panel: #211a15;
+    --line: #3a2c23;
+    --text: #ece2d8;
+    --muted: #a3877a;
+    --accent: #ffb020;
+    --accent-soft: #3a2a15;
+    --bezel: #0d0a08;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font: 16px/1.55 "PT Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+
+  .eyebrow {
+    font-family: "PT Sans Narrow", "PT Sans", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .16em;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-family: "PT Sans Narrow", "PT Sans", sans-serif;
+    font-weight: 700;
+    font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.05;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lead { margin: 0; max-width: 66ch; color: var(--muted); }
+  .lead b { color: var(--text); }
+
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 22px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+
+  .monitor {
+    background: var(--bezel);
+    border-radius: 10px;
+    padding: 14px 14px 10px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    image-rendering: pixelated;
+    background: var(--screen-bg);
+    border-radius: 3px;
+    outline: none;
+  }
+  canvas:focus-visible { box-shadow: 0 0 0 3px var(--accent); }
+
+  .monitor-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-family: "PT Sans Narrow", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: 12px;
+    color: #b7a79c;
+  }
+  .lamp { color: #ffb020; }
+  .lamp[data-state="idle"] { color: #6f635b; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .panel h2 {
+    font-family: "PT Sans Narrow", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+
+  .choice { display: flex; flex-direction: column; gap: 6px; }
+  .choice label {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .choice label:hover { border-color: var(--accent); }
+  .choice input { margin: 3px 0 0; accent-color: var(--accent); }
+  .choice span { display: block; }
+  .choice small { display: block; color: var(--muted); font-size: 13px; line-height: 1.35; }
+
+  .counters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .counter {
+    border-top: 2px solid var(--accent);
+    padding-top: 6px;
+  }
+  .counter b {
+    display: block;
+    font-family: "PT Sans Narrow", sans-serif;
+    font-size: 26px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .counter span {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+  }
+  .per-move { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
+  .per-move b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  button, select {
+    font: inherit;
+    font-family: "PT Sans Narrow", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 700; }
+  button.primary:hover { filter: brightness(1.08); }
+  select { width: 100%; }
+
+  .keys { font-size: 13px; color: var(--muted); }
+  .keys kbd {
+    font-family: "PT Sans Narrow", sans-serif;
+    background: var(--accent-soft);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0 5px;
+    color: var(--text);
+  }
+
+  details {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  summary {
+    font-family: "PT Sans Narrow", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  summary::marker { color: var(--accent); }
+
+  textarea {
+    width: 100%;
+    height: 340px;
+    margin-top: 12px;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text);
+    background: var(--ground);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 10px 12px;
+    resize: vertical;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+
+  .notes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px 28px;
+  }
+  .notes section { display: flex; flex-direction: column; gap: 6px; }
+  .notes h3 {
+    font-family: "PT Sans Narrow", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: 12px;
+    color: var(--accent);
+    margin: 0;
+  }
+  .notes p { margin: 0; font-size: 14.5px; color: var(--muted); }
+  .notes b { color: var(--text); }
+  code {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: .92em;
+    background: var(--accent-soft);
+    border-radius: 3px;
+    padding: 0 4px;
+  }
+
+  hr { border: none; border-top: 1px solid var(--line); margin: 0; }
+
+  .msg {
+    font-size: 13px;
+    color: var(--muted);
+    min-height: 1.4em;
+  }
+  .msg[data-kind="bad"] { color: #d34a2a; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Электроника МС 0511 · Вильнюс-Бейсик 1988.09.28</div>
+    <h1>Тетрис на кассетном Бейсике</h1>
+    <p class="lead">Это настоящий Бейсик, а не запись экрана: программа лежит в памяти машины,
+      её можно править и запускать. Наберите <b>RUN</b> — и пойдёт тетрис. Две версии отличаются
+      одной подпрограммой: первая перепечатывает только изменившиеся клетки, вторая стирает фигуру
+      целиком и печатает заново. Счётчик справа показывает разницу.</p>
+  </header>
+
+  <div class="stage">
+    <div class="monitor">
+      <canvas id="screen" width="512" height="264" tabindex="0"
+              aria-label="Экран УКНЦ, 64 на 24 знакоместа"></canvas>
+      <div class="monitor-foot">
+        <span>УК-НЦ · 64×24 · КОИ-7</span>
+        <span class="lamp" id="lamp" data-state="idle">готов</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div>
+        <h2>Программа в памяти</h2>
+        <div class="choice">
+          <label>
+            <input type="radio" name="prog" value="diff" checked>
+            <span>Немигающая<small>перепечатывает только разницу: сдвиг I — одна клетка</small></span>
+          </label>
+          <label>
+            <input type="radio" name="prog" value="classic">
+            <span>Мигающая<small>стирает все четыре клетки и печатает заново</small></span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <h2>Клеток напечатано</h2>
+        <div class="counters">
+          <div class="counter"><b id="drawn">0</b><span>напечатано</span></div>
+          <div class="counter"><b id="erased">0</b><span>стёрто</span></div>
+        </div>
+        <p class="per-move">За последний ход: <b id="last-move">—</b></p>
+      </div>
+
+      <div>
+        <h2>Скорость</h2>
+        <select id="speed">
+          <option value="3500" selected>как на УКНЦ</option>
+          <option value="10000">втрое быстрее</option>
+          <option value="40000">во весь опор</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <button class="primary" id="run">Запустить</button>
+        <button id="stop">Стоп</button>
+        <button id="reset">Сброс</button>
+      </div>
+
+      <p class="keys"><kbd>A</kbd> <kbd>D</kbd> — вбок, <kbd>W</kbd> — поворот,
+        <kbd>S</kbd> — вниз, <kbd>пробел</kbd> — сброс, <kbd>P</kbd> — пауза,
+        <kbd>Q</kbd> — выход. Стрелки тоже работают. Щёлкните по экрану, чтобы он слышал клавиши.</p>
+      <p class="msg" id="msg"></p>
+    </div>
+  </div>
+
+  <details open>
+    <summary>Листинг — правьте и записывайте в память</summary>
+    <textarea id="listing" spellcheck="false" aria-label="Текст программы на Бейсике"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="load">Записать в память</button>
+      <button id="restore">Вернуть исходный</button>
+    </div>
+  </details>
+
+  <hr>
+
+  <div class="notes">
+    <section>
+      <h3>Что здесь настоящее</h3>
+      <p>Начертания букв сняты с самой машины: программа напечатала все коды от 32 до 255 в
+        эмуляторе, снимок разобран по знакоместам. То, что вы видите, — <b>шрифт ПЗУ УКНЦ</b>.</p>
+    </section>
+    <section>
+      <h3>Чего здесь нет</h3>
+      <p>Это не эмулятор УКНЦ, а разборщик подмножества его Бейсика. Он повторяет диалект в том,
+        что важно для программы, но не считает такты процессора. Настоящая машина —
+        <b>UKNCBTL</b> с картриджем Вильнюс-Бейсика.</p>
+    </section>
+    <section>
+      <h3>Правила диалекта</h3>
+      <p>Один оператор в строке: двоеточия эта система не знает. Значимы <b>две первые буквы
+        имени</b>, а <code>SC</code>, <code>SY</code>, <code>LP</code> и <code>PO</code> заняты
+        системой. Графики нет вовсе, поэтому тетрис текстовый.</p>
+    </section>
+    <section>
+      <h3>Откуда числа задержек</h3>
+      <p>Скорость измерена на живой машине: холостой виток главного цикла — <b>примерно 350 раз
+        в секунду</b>. Отсюда таблица гравитации: на нулевом уровне фигура падает на клетку за
+        секунду.</p>
+    </section>
+  </div>
+</div>
+
+<script type="text/plain" id="src-diff">1 REM ***************************************************************
+2 REM * TETRIS FOR UKNC (ELEKTRONIKA MS 0511), CASSETTE BASIC        *
+3 REM * VILNIUS 1988.09.28, TEXT SCREEN 64X24.                       *
+4 REM * THE ACTIVE PIECE IS UPDATED BY CELL DIFF: A MOVE REPRINTS    *
+5 REM * ONLY THE CELLS THAT REALLY CHANGED, SO IT DOES NOT BLINK.    *
+6 REM * THE BLINKING TWIN OF THIS PROGRAM IS TETRISC.BAS.            *
+7 REM ***************************************************************
+8 REM THIS BASIC HAS NO STATEMENT SEPARATOR: ONE STATEMENT PER LINE.
+9 REM IT HAS NO GRAPHICS EITHER - LINE AND PSET ANSWER WITH ERROR 5.
+10 REM AND IT MUST NOT TOUCH COLOR: A CELL PRINTED AFTER COLOR KEEPS A
+11 REM COLOURED BLOCK THAT PRINTING SPACES OVER IT DOES NOT CLEAR, SO
+12 REM THE GAME STAYS IN THE COLOURS THE MACHINE BOOTS WITH.
+13 REM ONLY THE FIRST TWO LETTERS OF A NAME ARE SIGNIFICANT, SO EVERY
+14 REM VARIABLE IS TWO LETTERS. SC, SY AND LP ARE TAKEN BY THE SYSTEM
+15 REM AND CANNOT BE ASSIGNED AT ALL. DICTIONARY:
+16 REM  BW BH BOARD SIZE     BD BOARD ARRAY     BX BY WELL ORIGIN
+17 REM  CT CR CX CY CURRENT PIECE               NT NEXT PIECE TYPE
+18 REM  PT PR PX PY PREVIOUS PIECE              SI SHAPE INDEX
+19 REM  SX TY SHAPE CELLS    NR SP ROTATIONS AND SPAWN COLUMN
+20 REM  KX KY KN KICKS       KA KV NK KEY CODES AND ACTIONS
+21 REM  GD LD AG GRAVITY, LOCK AND GRACE DELAYS IN TICKS PER LEVEL
+22 REM  AX AY OLD CELLS      NX NY NEW CELLS    GX GY CELL TO PRINT
+23 REM  TK GT LK GR LR UP TICK, GRAVITY, LOCK, GROUNDED, RESETS, LIFT
+24 REM  SR LN LV NC SCORE, LINES, LEVEL, ROWS CLEARED NOW
+25 REM  LT RC LAST PIECE AND REPEAT COUNT       FL 0 RUN 1 OVER 2 QUIT
+26 REM  DC EC DB DRAWN, ERASED, DEBUG FLAG
+27 REM  KB KC AK ES KEY CHAR, CODE, ACTION, ESCAPE PENDING
+28 REM  HX HUD COLUMN        PV PIECE IN PREVIEW
+29 REM  H EX EY COLLISION SCRATCH   I J X Y Z W LOOP SCRATCH
+30 REM  RX RY ROTATION SCRATCH      CB CE BLOCK AND BLANK
+31 REM LINE MAP: 100 CONFIG, 200 TABLES, 300 NEW GAME, 400 MAIN LOOP,
+32 REM 500 GAME OVER, 1000 KEYS, 2000 SPAWN, 3000 MOVES, 3300 COLLIDE,
+33 REM 4000 ROTATE, 5000 DIFF, 6000 LOCK AND LINES, 7000 HUD,
+34 REM 8000 CELL PRINTING, 9000 DEBUG, 10000 DATA.
+99 GOTO 100
+100 REM ---------------- CONFIGURATION ----------------
+101 BW%=10
+102 BH%=20
+103 BX%=3
+104 BY%=1
+105 HX%=30
+106 AC%=0
+107 ML%=12
+108 SL%=0
+109 LX%=9
+110 DB%=0
+111 CB$="[]"
+112 CE$="  "
+113 REM THE BLOCK IS ONE VARIABLE, SO THE LOOK OF A CELL IS ONE EDIT.
+114 REM THIS BASIC CANNOT REDEFINE THE CHARACTER GENERATOR - SYMBOL,
+115 REM CHAR, FONT AND DEFCHR ALL ANSWER WITH ERROR 2 - SO A BLOCK IS
+116 REM MADE OF CHARACTERS THAT ALREADY EXIST. THE KOI-7 BOX DRAWING
+117 REM SET LIVES AT 160..191, FOR EXAMPLE CB$=CHR$(179)+CHR$(179).
+120 DIM BD%(9,19),SX%(27,3),TY%(27,3)
+121 DIM NR%(7),SP%(7)
+122 DIM KX%(9),KY%(9)
+123 DIM GD%(9),LD%(9),AG%(9)
+124 DIM AX%(3),AY%(3),NX%(3),NY%(3)
+125 DIM KA%(23),KV%(23)
+200 REM ---------------- TABLES FROM DATA ----------------
+201 FOR Z%=1 TO 7
+202 READ NR%(Z%),SP%(Z%)
+203 FOR J%=0 TO NR%(Z%)-1
+204 SI%=(Z%-1)*4+J%
+205 FOR I%=0 TO 3
+206 READ SX%(SI%,I%),TY%(SI%,I%)
+207 NEXT I%
+208 NEXT J%
+209 NEXT Z%
+210 READ KN%
+211 FOR I%=0 TO KN%-1
+212 READ KX%(I%),KY%(I%)
+213 NEXT I%
+214 FOR I%=0 TO LX%
+215 READ GD%(I%)
+216 NEXT I%
+217 FOR I%=0 TO LX%
+218 READ LD%(I%)
+219 NEXT I%
+220 FOR I%=0 TO LX%
+221 READ AG%(I%)
+222 NEXT I%
+223 READ NK%
+224 FOR I%=0 TO NK%-1
+225 READ KA%(I%),KV%(I%)
+226 NEXT I%
+250 REM ---------------- TITLE AND SEED ----------------
+252 CLS
+253 LOCATE 24,8
+254 PRINT "T E T R I S"
+255 LOCATE 18,11
+256 PRINT "A D - LEFT AND RIGHT, W - ROTATE"
+257 LOCATE 18,12
+258 PRINT "S - DOWN, SPACE - DROP, P - PAUSE"
+259 LOCATE 18,13
+260 PRINT "ARROWS WORK TOO, Q - QUIT"
+261 LOCATE 18,16
+262 PRINT "PRESS ANY KEY"
+263 RC%=0
+264 KB$=INKEY$
+265 IF KB$<>"" THEN GOTO 270
+266 RC%=RC%+1
+267 IF RC%>30000 THEN RC%=0
+268 GOTO 264
+270 Z%=RC%-INT(RC%/23)*23
+271 FOR I%=0 TO Z%
+272 W%=INT(RND(1)*7)
+273 NEXT I%
+300 REM ---------------- NEW GAME ----------------
+301 FOR Y%=0 TO BH%-1
+302 FOR X%=0 TO BW%-1
+303 BD%(X%,Y%)=0
+304 NEXT X%
+305 NEXT Y%
+306 SR=0
+307 LN%=0
+308 LV%=SL%
+309 FL%=0
+311 LT%=0
+312 RC%=0
+313 DC%=0
+314 EC%=0
+315 ES%=0
+316 PV%=0
+317 GOSUB 7000
+318 GOSUB 7100
+319 GOSUB 7200
+320 GOSUB 2100
+321 GOSUB 2000
+400 REM ---------------- MAIN LOOP ----------------
+401 GOSUB 1000
+402 IF AK%>0 THEN GOSUB 1100
+403 IF FL%>0 THEN GOTO 500
+405 GT%=GT%-1
+406 IF GT%<=0 THEN GOSUB 3100
+407 IF FL%>0 THEN GOTO 500
+408 IF GR%=0 THEN GOTO 401
+409 LK%=LK%-1
+410 IF LK%>0 THEN GOTO 401
+411 GOSUB 6000
+412 GOTO 403
+500 REM ---------------- GAME OVER ----------------
+501 IF FL%=2 THEN GOTO 560
+504 LOCATE HX%,18
+505 PRINT "GAME OVER"
+506 LOCATE HX%,20
+507 PRINT "P - PLAY AGAIN"
+508 LOCATE HX%,21
+509 PRINT "Q - QUIT"
+510 KB$=INKEY$
+511 IF KB$="" THEN GOTO 510
+512 KC%=ASC(KB$)
+513 IF KC%=80 THEN GOTO 300
+514 IF KC%=112 THEN GOTO 300
+515 IF KC%=81 THEN GOTO 560
+516 IF KC%=113 THEN GOTO 560
+517 GOTO 510
+560 CLS
+562 END
+1000 REM ---- READ ONE KEY, OUT AK% ----
+1001 AK%=0
+1002 KB$=INKEY$
+1003 IF KB$="" THEN RETURN
+1004 KC%=ASC(KB$)
+1005 IF KC%=27 THEN GOTO 1050
+1006 IF ES%=1 THEN GOTO 1060
+1007 FOR I%=0 TO NK%-1
+1008 IF KC%=KA%(I%) THEN AK%=KV%(I%)
+1009 NEXT I%
+1010 RETURN
+1050 ES%=1
+1051 RETURN
+1060 REM ---- SECOND BYTE OF AN ARROW: ESC A B C D ----
+1061 ES%=0
+1062 IF KC%=65 THEN AK%=4
+1063 IF KC%=66 THEN AK%=3
+1064 IF KC%=67 THEN AK%=2
+1065 IF KC%=68 THEN AK%=1
+1066 RETURN
+1100 REM ---- DISPATCH ACTION ----
+1101 IF AK%=1 THEN GOSUB 3000
+1102 IF AK%=2 THEN GOSUB 3010
+1103 IF AK%=3 THEN GOSUB 3020
+1104 IF AK%=4 THEN GOSUB 4000
+1105 IF AK%=5 THEN GOSUB 3040
+1106 IF AK%=6 THEN GOSUB 1150
+1107 IF AK%=7 THEN FL%=2
+1108 IF DB%=1 THEN GOSUB 9010
+1109 RETURN
+1150 REM ---- PAUSE ----
+1153 LOCATE HX%,18
+1154 PRINT "PAUSE"
+1155 KB$=INKEY$
+1156 IF KB$="" THEN GOTO 1155
+1157 KC%=ASC(KB$)
+1158 IF KC%=80 THEN GOTO 1161
+1159 IF KC%=112 THEN GOTO 1161
+1160 GOTO 1155
+1161 LOCATE HX%,18
+1162 PRINT "     "
+1163 RETURN
+2000 REM ---- SPAWN: NEXT BECOMES CURRENT ----
+2001 CT%=NT%
+2002 CR%=0
+2003 CX%=SP%(CT%)
+2004 CY%=0
+2005 UP%=0
+2006 GR%=0
+2007 LR%=0
+2008 GT%=GD%(LV%)
+2009 GOSUB 3300
+2010 IF Q%=1 THEN FL%=1
+2011 IF Q%=1 THEN RETURN
+2012 FOR I%=0 TO 3
+2013 AX%(I%)=-9
+2014 AY%(I%)=-9
+2015 NEXT I%
+2016 GOSUB 5100
+2017 GOSUB 2100
+2018 GOSUB 7300
+2019 RETURN
+2100 REM ---- PICK NEXT TYPE, ONE REROLL AFTER THREE REPEATS ----
+2101 GOSUB 2150
+2102 IF Z%=LT% THEN GOTO 2105
+2103 RC%=0
+2104 GOTO 2110
+2105 RC%=RC%+1
+2106 IF RC%<3 THEN GOTO 2110
+2107 GOSUB 2150
+2108 RC%=0
+2110 NT%=Z%
+2111 LT%=Z%
+2112 RETURN
+2150 REM ---- RANDOM TYPE 1..7 INTO Z% ----
+2151 Z%=INT(RND(1)*7)+1
+2152 IF Z%>7 THEN Z%=7
+2153 RETURN
+3000 REM ---- MOVE LEFT ----
+3001 DX%=-1
+3002 DY%=0
+3003 GOSUB 3200
+3004 IF Q%=0 THEN GOSUB 3400
+3005 RETURN
+3010 REM ---- MOVE RIGHT ----
+3011 DX%=1
+3012 DY%=0
+3013 GOSUB 3200
+3014 IF Q%=0 THEN GOSUB 3400
+3015 RETURN
+3020 REM ---- SOFT DROP ----
+3021 DX%=0
+3022 DY%=1
+3023 GOSUB 3200
+3024 IF Q%=1 THEN GOTO 3030
+3025 SR=SR+LV%+1
+3026 GT%=GD%(LV%)
+3027 GOSUB 7100
+3028 RETURN
+3030 GOSUB 3450
+3031 RETURN
+3040 REM ---- HARD DROP, NO IMMEDIATE LOCK ----
+3041 GOSUB 5000
+3042 Z%=0
+3043 CY%=CY%+1
+3044 GOSUB 3300
+3045 IF Q%=0 THEN GOTO 3060
+3046 CY%=CY%-1
+3047 IF Z%>0 THEN GOSUB 3070
+3048 GOSUB 3450
+3049 RETURN
+3060 Z%=Z%+1
+3061 GOTO 3043
+3070 SR=SR+2*Z%*(LV%+1)
+3071 UP%=0
+3072 GOSUB 5100
+3073 GOSUB 7100
+3074 RETURN
+3100 REM ---- GRAVITY TICK ----
+3101 DX%=0
+3102 DY%=1
+3103 GOSUB 3200
+3104 IF Q%=1 THEN GOTO 3108
+3105 GR%=0
+3106 GT%=GD%(LV%)
+3107 RETURN
+3108 GOSUB 3450
+3109 GT%=GD%(LV%)
+3110 RETURN
+3200 REM ---- TRY MOVE BY DX% DY%, OUT Q% 0 MOVED 1 BLOCKED ----
+3201 GOSUB 5000
+3202 CX%=CX%+DX%
+3203 CY%=CY%+DY%
+3204 GOSUB 3300
+3205 IF Q%=0 THEN GOTO 3209
+3206 CX%=CX%-DX%
+3207 CY%=CY%-DY%
+3208 RETURN
+3209 IF DY%>0 THEN UP%=0
+3210 GOSUB 5100
+3211 RETURN
+3300 REM ---- COLLISION OF CURRENT STATE, OUT Q% 1 = HIT ----
+3301 SI%=(CT%-1)*4+CR%
+3302 Q%=0
+3303 FOR H%=0 TO 3
+3304 EX%=CX%+SX%(SI%,H%)
+3305 HY%=CY%+TY%(SI%,H%)
+3306 IF EX%<0 THEN Q%=1
+3307 IF EX%>=BW% THEN Q%=1
+3308 IF HY%>=BH% THEN Q%=1
+3309 IF Q%=1 THEN GOTO 3312
+3310 IF HY%<0 THEN GOTO 3312
+3311 IF BD%(EX%,HY%)>0 THEN Q%=1
+3312 NEXT H%
+3313 RETURN
+3400 REM ---- AFTER A SUCCESSFUL PLAYER ACTION ----
+3401 IF GT%<AG%(LV%) THEN GT%=AG%(LV%)
+3402 IF GR%=0 THEN RETURN
+3403 CY%=CY%+1
+3404 GOSUB 3300
+3405 CY%=CY%-1
+3406 IF Q%=1 THEN GOTO 3409
+3407 GR%=0
+3408 RETURN
+3409 IF LR%>=ML% THEN GOTO 3413
+3410 LR%=LR%+1
+3411 LK%=LD%(LV%)
+3412 RETURN
+3413 IF LK%<AG%(LV%) THEN LK%=AG%(LV%)
+3414 RETURN
+3450 REM ---- ENTER GROUNDED STATE ----
+3451 IF GR%=1 THEN RETURN
+3452 GR%=1
+3453 LK%=LD%(LV%)
+3454 LR%=0
+3455 RETURN
+4000 REM ---- TRY ROTATE CLOCKWISE WITH KICKS ----
+4001 IF NR%(CT%)=1 THEN RETURN
+4002 GOSUB 5000
+4003 W%=CR%+1
+4004 IF W%>=NR%(CT%) THEN W%=0
+4005 RX%=CX%
+4006 RY%=CY%
+4007 I%=0
+4008 CR%=W%
+4009 CX%=RX%+KX%(I%)
+4010 CY%=RY%+KY%(I%)
+4011 GOSUB 3300
+4012 IF Q%=0 THEN GOTO 4020
+4013 I%=I%+1
+4014 IF I%<KN% THEN GOTO 4008
+4015 CR%=PR%
+4016 CX%=RX%
+4017 CY%=RY%
+4018 RETURN
+4020 REM ---- ROTATION ACCEPTED WITH KICK I% ----
+4021 IF KY%(I%)<0 THEN UP%=UP%-KY%(I%)
+4022 IF AC%=1 THEN GOTO 4030
+4023 IF UP%<=0 THEN GOTO 4030
+4024 CY%=CY%+1
+4025 GOSUB 3300
+4026 IF Q%=1 THEN GOTO 4029
+4027 UP%=UP%-1
+4028 GOTO 4023
+4029 CY%=CY%-1
+4030 GOSUB 5100
+4031 GOSUB 3400
+4032 RETURN
+5000 REM ---- SNAPSHOT CURRENT PIECE AS THE OLD CELL SET ----
+5001 PT%=CT%
+5002 PR%=CR%
+5003 PX%=CX%
+5004 PY%=CY%
+5005 SI%=(PT%-1)*4+PR%
+5006 FOR I%=0 TO 3
+5007 AX%(I%)=PX%+SX%(SI%,I%)
+5008 AY%(I%)=PY%+TY%(SI%,I%)
+5009 NEXT I%
+5010 RETURN
+5100 REM ---- DIFFERENTIAL RENDER: OLD SET AX AY -> CURRENT PIECE ----
+5101 REM BOTH SETS ARE IN WELL COORDINATES, SO A ONE CELL MOVE
+5102 REM REPRINTS ONLY THE CELLS THAT APPEARED OR DISAPPEARED.
+5103 SI%=(CT%-1)*4+CR%
+5104 FOR I%=0 TO 3
+5105 NX%(I%)=CX%+SX%(SI%,I%)
+5106 NY%(I%)=CY%+TY%(SI%,I%)
+5107 NEXT I%
+5108 FOR I%=0 TO 3
+5109 Z%=0
+5110 FOR J%=0 TO 3
+5111 IF AX%(I%)<>NX%(J%) THEN GOTO 5113
+5112 IF AY%(I%)=NY%(J%) THEN Z%=1
+5113 NEXT J%
+5114 IF Z%=1 THEN GOTO 5118
+5115 GX%=AX%(I%)
+5116 GY%=AY%(I%)
+5117 GOSUB 8100
+5118 NEXT I%
+5119 FOR I%=0 TO 3
+5120 Z%=0
+5121 FOR J%=0 TO 3
+5122 IF NX%(I%)<>AX%(J%) THEN GOTO 5124
+5123 IF NY%(I%)=AY%(J%) THEN Z%=1
+5124 NEXT J%
+5125 IF Z%=1 THEN GOTO 5130
+5126 GX%=NX%(I%)
+5127 GY%=NY%(I%)
+5129 GOSUB 8000
+5130 NEXT I%
+5131 LOCATE HX%,BY%+19
+5132 RETURN
+6000 REM ---- LOCK THE PIECE INTO THE BOARD ----
+6001 SI%=(CT%-1)*4+CR%
+6002 FOR I%=0 TO 3
+6003 X%=CX%+SX%(SI%,I%)
+6004 Y%=CY%+TY%(SI%,I%)
+6005 IF Y%>=0 THEN BD%(X%,Y%)=CT%
+6006 NEXT I%
+6007 GOSUB 6100
+6008 GOSUB 2000
+6009 RETURN
+6100 REM ---- COUNT AND REMOVE FULL ROWS ----
+6101 NC%=0
+6102 FOR Y%=0 TO BH%-1
+6103 Z%=1
+6104 FOR X%=0 TO BW%-1
+6105 IF BD%(X%,Y%)=0 THEN Z%=0
+6106 NEXT X%
+6107 IF Z%=1 THEN NC%=NC%+1
+6108 NEXT Y%
+6109 IF NC%=0 THEN RETURN
+6110 GOSUB 6120
+6111 GOSUB 6200
+6112 RETURN
+6120 REM ---- COMPACT THE WELL, REPRINT ONLY CHANGED CELLS ----
+6121 W%=BH%-1
+6122 FOR Y%=BH%-1 TO 0 STEP -1
+6123 Z%=1
+6124 FOR X%=0 TO BW%-1
+6125 IF BD%(X%,Y%)=0 THEN Z%=0
+6126 NEXT X%
+6127 IF Z%=1 THEN GOTO 6130
+6128 GOSUB 6140
+6129 W%=W%-1
+6130 NEXT Y%
+6131 IF W%<0 THEN RETURN
+6132 FOR Y%=W% TO 0 STEP -1
+6133 GOSUB 6160
+6134 NEXT Y%
+6135 RETURN
+6140 REM ---- COPY ROW Y% ONTO ROW W% ----
+6141 IF Y%=W% THEN RETURN
+6142 FOR X%=0 TO BW%-1
+6143 IF BD%(X%,W%)=BD%(X%,Y%) THEN GOTO 6150
+6144 BD%(X%,W%)=BD%(X%,Y%)
+6145 GX%=X%
+6146 GY%=W%
+6147 V%=BD%(X%,W%)
+6148 IF V%=0 THEN GOSUB 8100
+6149 IF V%>0 THEN GOSUB 8000
+6150 NEXT X%
+6151 RETURN
+6160 REM ---- BLANK ROW Y% ----
+6161 FOR X%=0 TO BW%-1
+6162 IF BD%(X%,Y%)=0 THEN GOTO 6167
+6163 BD%(X%,Y%)=0
+6164 GX%=X%
+6165 GY%=Y%
+6166 GOSUB 8100
+6167 NEXT X%
+6168 RETURN
+6200 REM ---- SCORE AND LEVEL FOR NC% ROWS ----
+6201 IF NC%=1 THEN SR=SR+100*(LV%+1)
+6202 IF NC%=2 THEN SR=SR+300*(LV%+1)
+6203 IF NC%=3 THEN SR=SR+600*(LV%+1)
+6204 IF NC%=4 THEN SR=SR+1000*(LV%+1)
+6205 LN%=LN%+NC%
+6206 Z%=INT(LN%/10)
+6207 IF Z%>LX% THEN Z%=LX%
+6208 IF Z%>LV% THEN LV%=Z%
+6209 GOSUB 7100
+6210 GOSUB 7200
+6211 RETURN
+7000 REM ---- STATIC SCREEN: WELL FRAME AND LABELS ----
+7002 CLS
+7005 LOCATE BX%-1,BY%-1
+7006 PRINT "+";
+7007 PRINT STRING$(BW%*2,"-");
+7008 PRINT "+";
+7009 FOR Y%=0 TO BH%-1
+7010 LOCATE BX%-1,BY%+Y%
+7011 PRINT "!";
+7012 LOCATE BX%+BW%*2,BY%+Y%
+7013 PRINT "!";
+7014 NEXT Y%
+7015 LOCATE BX%-1,BY%+BH%
+7016 PRINT "+";
+7017 PRINT STRING$(BW%*2,"-");
+7018 PRINT "+";
+7019 LOCATE HX%,BY%
+7020 PRINT "NEXT"
+7021 LOCATE HX%,BY%+7
+7022 PRINT "SCORE"
+7023 LOCATE HX%,BY%+10
+7024 PRINT "LEVEL"
+7025 LOCATE HX%,BY%+13
+7026 PRINT "LINES"
+7027 RETURN
+7100 REM ---- SCORE ----
+7103 LOCATE HX%,BY%+8
+7104 PRINT SR;
+7105 RETURN
+7200 REM ---- LEVEL AND LINES ----
+7203 LOCATE HX%,BY%+11
+7204 PRINT LV%;
+7205 LOCATE HX%,BY%+14
+7206 PRINT LN%;
+7207 RETURN
+7300 REM ---- NEXT PREVIEW: ERASE THE OLD PIECE, PRINT THE NEW ONE ----
+7301 IF PV%=0 THEN GOTO 7310
+7302 SI%=(PV%-1)*4
+7305 FOR I%=0 TO 3
+7306 LOCATE HX%+SX%(SI%,I%)*2,BY%+2+TY%(SI%,I%)
+7307 PRINT CE$;
+7308 NEXT I%
+7310 SI%=(NT%-1)*4
+7313 FOR I%=0 TO 3
+7314 LOCATE HX%+SX%(SI%,I%)*2,BY%+2+TY%(SI%,I%)
+7315 PRINT CB$;
+7316 NEXT I%
+7317 PV%=NT%
+7318 RETURN
+8000 REM ---- PRINT A BLOCK AT WELL CELL GX% GY% ----
+8001 IF GY%<0 THEN RETURN
+8003 LOCATE BX%+GX%*2,BY%+GY%
+8004 PRINT CB$;
+8005 DC%=DC%+1
+8006 RETURN
+8010 REM THE TEXT CURSOR SITS WHERE THE LAST PRINT ENDED, SO AFTER A
+8011 REM REDRAW IT IS PARKED IN THE EMPTY PART OF THE PANEL BY 5131.
+8100 REM ---- ERASE WELL CELL GX% GY% ----
+8101 IF GY%<0 THEN RETURN
+8102 LOCATE BX%+GX%*2,BY%+GY%
+8103 PRINT CE$;
+8104 EC%=EC%+1
+8105 RETURN
+9000 REM ---- RESET DEBUG COUNTERS ----
+9001 DC%=0
+9002 EC%=0
+9003 RETURN
+9010 REM ---- SHOW HOW MANY CELLS WERE PRINTED AND ERASED ----
+9013 LOCATE HX%,BY%+17
+9014 PRINT DC%;EC%;"  ";
+9015 RETURN
+10000 REM ================= SHAPE TABLES =================
+10001 REM PER TYPE: ROTATIONS, SPAWN COLUMN, THEN FOUR X,Y
+10002 REM PAIRS PER ROTATION. Y GROWS DOWNWARDS. ALL OFFSETS FIT A 4X4
+10003 REM BOX, SO NO HIDDEN ROWS ABOVE THE WELL ARE NEEDED.
+10004 REM T, J AND L TURN AROUND THE CELL (1,1); I, S AND Z HAVE TWO
+10005 REM ORIENTATIONS AND O HAS ONE. THE CENTRE IS CHOSEN SO THAT A
+10006 REM QUARTER TURN KEEPS AS MANY CELLS AS POSSIBLE: T KEEPS THREE.
+10010 REM I
+10011 DATA 2,3
+10012 DATA 0,1, 1,1, 2,1, 3,1
+10013 DATA 1,0, 1,1, 1,2, 1,3
+10020 REM O
+10021 DATA 1,4
+10022 DATA 0,0, 1,0, 0,1, 1,1
+10030 REM T
+10031 DATA 4,3
+10032 DATA 0,1, 1,1, 2,1, 1,2
+10033 DATA 1,0, 0,1, 1,1, 1,2
+10034 DATA 1,0, 0,1, 1,1, 2,1
+10035 DATA 1,0, 1,1, 2,1, 1,2
+10040 REM S
+10041 DATA 2,3
+10042 DATA 1,1, 2,1, 0,2, 1,2
+10043 DATA 0,0, 0,1, 1,1, 1,2
+10050 REM Z
+10051 DATA 2,3
+10052 DATA 0,1, 1,1, 1,2, 2,2
+10053 DATA 1,0, 0,1, 1,1, 0,2
+10060 REM J
+10061 DATA 4,3
+10062 DATA 0,0, 0,1, 1,1, 2,1
+10063 DATA 1,0, 2,0, 1,1, 1,2
+10064 DATA 0,1, 1,1, 2,1, 2,2
+10065 DATA 1,0, 1,1, 0,2, 1,2
+10070 REM L
+10071 DATA 4,3
+10072 DATA 2,0, 0,1, 1,1, 2,1
+10073 DATA 1,0, 1,1, 1,2, 2,2
+10074 DATA 0,1, 1,1, 2,1, 0,2
+10075 DATA 0,0, 1,0, 1,1, 1,2
+10100 REM ================= KICK OFFSETS =================
+10101 REM COUNT, THEN X,Y PAIRS TRIED IN THIS ORDER. SIDEWAYS FIRST SO
+10102 REM THAT A PIECE NEXT TO A WALL IS NOT LIFTED FOR NOTHING; THE
+10103 REM TWO CELL LIFT AT THE END IS WHAT TURNS A FLAT I UPRIGHT.
+10104 DATA 7
+10105 DATA 0,0, -1,0, 1,0, 0,-1, -2,0, 2,0, 0,-2
+10200 REM ================= TIMING TABLES =================
+10201 REM MAIN LOOP TICKS PER LEVEL 0..9. MEASURED ON THE MACHINE
+10202 REM ITSELF: THE IDLE LOOP DOES ABOUT 350 TICKS PER SECOND, SO
+10203 REM LEVEL 0 DROPS ONE ROW A SECOND AND LEVEL 9 EIGHT TIMES THAT.
+10204 DATA 350,280,225,180,145,115,90,70,55,43
+10205 REM LOCK DELAY
+10206 DATA 350,350,320,290,260,230,200,180,180,180
+10207 REM ACTION GRACE
+10208 DATA 140,140,130,130,120,120,110,110,100,100
+10300 REM ================= KEYS =================
+10301 REM COUNT, THEN KOI-7 CODE AND ACTION:
+10302 REM 1 LEFT, 2 RIGHT, 3 SOFT DROP, 4 ROTATE, 5 HARD DROP,
+10303 REM 6 PAUSE, 7 QUIT. 7 9 8 5 IS THE LAYOUT OF THE BK-0010
+10304 REM TETRIS. THE ARROW KEYS ARRIVE AS ESC PLUS A B C D AND ARE
+10305 REM HANDLED SEPARATELY AT LINE 1060.
+10306 DATA 17
+10307 DATA 65,1, 97,1
+10308 DATA 68,2, 100,2
+10309 DATA 83,3, 115,3
+10310 DATA 87,4, 119,4
+10311 DATA 32,5
+10312 DATA 80,6, 112,6
+10313 DATA 81,7, 113,7
+10314 DATA 55,1, 57,2, 53,3, 56,4</script>
+<script type="text/plain" id="src-classic">1 REM ***************************************************************
+2 REM * TETRIS FOR UKNC (ELEKTRONIKA MS 0511), CASSETTE BASIC        *
+3 REM * VILNIUS 1988.09.28, TEXT SCREEN 64X24.                       *
+4 REM * THE ACTIVE PIECE IS WIPED AND PRINTED AGAIN ON EVERY MOVE    *
+5 REM * AND EVERY TURN, SO IT BLINKS. IT IS HERE FOR COMPARISON.     *
+6 REM * THE FLICKER-FREE ORIGINAL IS TETRIS.BAS.                     *
+7 REM ***************************************************************
+8 REM THIS BASIC HAS NO STATEMENT SEPARATOR: ONE STATEMENT PER LINE.
+9 REM IT HAS NO GRAPHICS EITHER - LINE AND PSET ANSWER WITH ERROR 5.
+10 REM AND IT MUST NOT TOUCH COLOR: A CELL PRINTED AFTER COLOR KEEPS A
+11 REM COLOURED BLOCK THAT PRINTING SPACES OVER IT DOES NOT CLEAR, SO
+12 REM THE GAME STAYS IN THE COLOURS THE MACHINE BOOTS WITH.
+13 REM ONLY THE FIRST TWO LETTERS OF A NAME ARE SIGNIFICANT, SO EVERY
+14 REM VARIABLE IS TWO LETTERS. SC, SY AND LP ARE TAKEN BY THE SYSTEM
+15 REM AND CANNOT BE ASSIGNED AT ALL. DICTIONARY:
+16 REM  BW BH BOARD SIZE     BD BOARD ARRAY     BX BY WELL ORIGIN
+17 REM  CT CR CX CY CURRENT PIECE               NT NEXT PIECE TYPE
+18 REM  PT PR PX PY PREVIOUS PIECE              SI SHAPE INDEX
+19 REM  SX TY SHAPE CELLS    NR SP ROTATIONS AND SPAWN COLUMN
+20 REM  KX KY KN KICKS       KA KV NK KEY CODES AND ACTIONS
+21 REM  GD LD AG GRAVITY, LOCK AND GRACE DELAYS IN TICKS PER LEVEL
+22 REM  AX AY OLD CELLS      NX NY NEW CELLS    GX GY CELL TO PRINT
+23 REM  TK GT LK GR LR UP TICK, GRAVITY, LOCK, GROUNDED, RESETS, LIFT
+24 REM  SR LN LV NC SCORE, LINES, LEVEL, ROWS CLEARED NOW
+25 REM  LT RC LAST PIECE AND REPEAT COUNT       FL 0 RUN 1 OVER 2 QUIT
+26 REM  DC EC DB DRAWN, ERASED, DEBUG FLAG
+27 REM  KB KC AK ES KEY CHAR, CODE, ACTION, ESCAPE PENDING
+28 REM  HX HUD COLUMN        PV PIECE IN PREVIEW
+29 REM  H EX EY COLLISION SCRATCH   I J X Y Z W LOOP SCRATCH
+30 REM  RX RY ROTATION SCRATCH      CB CE BLOCK AND BLANK
+31 REM LINE MAP: 100 CONFIG, 200 TABLES, 300 NEW GAME, 400 MAIN LOOP,
+32 REM 500 GAME OVER, 1000 KEYS, 2000 SPAWN, 3000 MOVES, 3300 COLLIDE,
+33 REM 4000 ROTATE, 5000 DIFF, 6000 LOCK AND LINES, 7000 HUD,
+34 REM 8000 CELL PRINTING, 9000 DEBUG, 10000 DATA.
+99 GOTO 100
+100 REM ---------------- CONFIGURATION ----------------
+101 BW%=10
+102 BH%=20
+103 BX%=3
+104 BY%=1
+105 HX%=30
+106 AC%=0
+107 ML%=12
+108 SL%=0
+109 LX%=9
+110 DB%=0
+111 CB$="[]"
+112 CE$="  "
+113 REM THE BLOCK IS ONE VARIABLE, SO THE LOOK OF A CELL IS ONE EDIT.
+114 REM THIS BASIC CANNOT REDEFINE THE CHARACTER GENERATOR - SYMBOL,
+115 REM CHAR, FONT AND DEFCHR ALL ANSWER WITH ERROR 2 - SO A BLOCK IS
+116 REM MADE OF CHARACTERS THAT ALREADY EXIST. THE KOI-7 BOX DRAWING
+117 REM SET LIVES AT 160..191, FOR EXAMPLE CB$=CHR$(179)+CHR$(179).
+120 DIM BD%(9,19),SX%(27,3),TY%(27,3)
+121 DIM NR%(7),SP%(7)
+122 DIM KX%(9),KY%(9)
+123 DIM GD%(9),LD%(9),AG%(9)
+124 DIM AX%(3),AY%(3),NX%(3),NY%(3)
+125 DIM KA%(23),KV%(23)
+200 REM ---------------- TABLES FROM DATA ----------------
+201 FOR Z%=1 TO 7
+202 READ NR%(Z%),SP%(Z%)
+203 FOR J%=0 TO NR%(Z%)-1
+204 SI%=(Z%-1)*4+J%
+205 FOR I%=0 TO 3
+206 READ SX%(SI%,I%),TY%(SI%,I%)
+207 NEXT I%
+208 NEXT J%
+209 NEXT Z%
+210 READ KN%
+211 FOR I%=0 TO KN%-1
+212 READ KX%(I%),KY%(I%)
+213 NEXT I%
+214 FOR I%=0 TO LX%
+215 READ GD%(I%)
+216 NEXT I%
+217 FOR I%=0 TO LX%
+218 READ LD%(I%)
+219 NEXT I%
+220 FOR I%=0 TO LX%
+221 READ AG%(I%)
+222 NEXT I%
+223 READ NK%
+224 FOR I%=0 TO NK%-1
+225 READ KA%(I%),KV%(I%)
+226 NEXT I%
+250 REM ---------------- TITLE AND SEED ----------------
+252 CLS
+253 LOCATE 24,8
+254 PRINT "T E T R I S"
+255 LOCATE 18,11
+256 PRINT "A D - LEFT AND RIGHT, W - ROTATE"
+257 LOCATE 18,12
+258 PRINT "S - DOWN, SPACE - DROP, P - PAUSE"
+259 LOCATE 18,13
+260 PRINT "ARROWS WORK TOO, Q - QUIT"
+261 LOCATE 18,16
+262 PRINT "PRESS ANY KEY"
+263 RC%=0
+264 KB$=INKEY$
+265 IF KB$<>"" THEN GOTO 270
+266 RC%=RC%+1
+267 IF RC%>30000 THEN RC%=0
+268 GOTO 264
+270 Z%=RC%-INT(RC%/23)*23
+271 FOR I%=0 TO Z%
+272 W%=INT(RND(1)*7)
+273 NEXT I%
+300 REM ---------------- NEW GAME ----------------
+301 FOR Y%=0 TO BH%-1
+302 FOR X%=0 TO BW%-1
+303 BD%(X%,Y%)=0
+304 NEXT X%
+305 NEXT Y%
+306 SR=0
+307 LN%=0
+308 LV%=SL%
+309 FL%=0
+311 LT%=0
+312 RC%=0
+313 DC%=0
+314 EC%=0
+315 ES%=0
+316 PV%=0
+317 GOSUB 7000
+318 GOSUB 7100
+319 GOSUB 7200
+320 GOSUB 2100
+321 GOSUB 2000
+400 REM ---------------- MAIN LOOP ----------------
+401 GOSUB 1000
+402 IF AK%>0 THEN GOSUB 1100
+403 IF FL%>0 THEN GOTO 500
+405 GT%=GT%-1
+406 IF GT%<=0 THEN GOSUB 3100
+407 IF FL%>0 THEN GOTO 500
+408 IF GR%=0 THEN GOTO 401
+409 LK%=LK%-1
+410 IF LK%>0 THEN GOTO 401
+411 GOSUB 6000
+412 GOTO 403
+500 REM ---------------- GAME OVER ----------------
+501 IF FL%=2 THEN GOTO 560
+504 LOCATE HX%,18
+505 PRINT "GAME OVER"
+506 LOCATE HX%,20
+507 PRINT "P - PLAY AGAIN"
+508 LOCATE HX%,21
+509 PRINT "Q - QUIT"
+510 KB$=INKEY$
+511 IF KB$="" THEN GOTO 510
+512 KC%=ASC(KB$)
+513 IF KC%=80 THEN GOTO 300
+514 IF KC%=112 THEN GOTO 300
+515 IF KC%=81 THEN GOTO 560
+516 IF KC%=113 THEN GOTO 560
+517 GOTO 510
+560 CLS
+562 END
+1000 REM ---- READ ONE KEY, OUT AK% ----
+1001 AK%=0
+1002 KB$=INKEY$
+1003 IF KB$="" THEN RETURN
+1004 KC%=ASC(KB$)
+1005 IF KC%=27 THEN GOTO 1050
+1006 IF ES%=1 THEN GOTO 1060
+1007 FOR I%=0 TO NK%-1
+1008 IF KC%=KA%(I%) THEN AK%=KV%(I%)
+1009 NEXT I%
+1010 RETURN
+1050 ES%=1
+1051 RETURN
+1060 REM ---- SECOND BYTE OF AN ARROW: ESC A B C D ----
+1061 ES%=0
+1062 IF KC%=65 THEN AK%=4
+1063 IF KC%=66 THEN AK%=3
+1064 IF KC%=67 THEN AK%=2
+1065 IF KC%=68 THEN AK%=1
+1066 RETURN
+1100 REM ---- DISPATCH ACTION ----
+1101 IF AK%=1 THEN GOSUB 3000
+1102 IF AK%=2 THEN GOSUB 3010
+1103 IF AK%=3 THEN GOSUB 3020
+1104 IF AK%=4 THEN GOSUB 4000
+1105 IF AK%=5 THEN GOSUB 3040
+1106 IF AK%=6 THEN GOSUB 1150
+1107 IF AK%=7 THEN FL%=2
+1108 IF DB%=1 THEN GOSUB 9010
+1109 RETURN
+1150 REM ---- PAUSE ----
+1153 LOCATE HX%,18
+1154 PRINT "PAUSE"
+1155 KB$=INKEY$
+1156 IF KB$="" THEN GOTO 1155
+1157 KC%=ASC(KB$)
+1158 IF KC%=80 THEN GOTO 1161
+1159 IF KC%=112 THEN GOTO 1161
+1160 GOTO 1155
+1161 LOCATE HX%,18
+1162 PRINT "     "
+1163 RETURN
+2000 REM ---- SPAWN: NEXT BECOMES CURRENT ----
+2001 CT%=NT%
+2002 CR%=0
+2003 CX%=SP%(CT%)
+2004 CY%=0
+2005 UP%=0
+2006 GR%=0
+2007 LR%=0
+2008 GT%=GD%(LV%)
+2009 GOSUB 3300
+2010 IF Q%=1 THEN FL%=1
+2011 IF Q%=1 THEN RETURN
+2012 FOR I%=0 TO 3
+2013 AX%(I%)=-9
+2014 AY%(I%)=-9
+2015 NEXT I%
+2016 GOSUB 5100
+2017 GOSUB 2100
+2018 GOSUB 7300
+2019 RETURN
+2100 REM ---- PICK NEXT TYPE, ONE REROLL AFTER THREE REPEATS ----
+2101 GOSUB 2150
+2102 IF Z%=LT% THEN GOTO 2105
+2103 RC%=0
+2104 GOTO 2110
+2105 RC%=RC%+1
+2106 IF RC%<3 THEN GOTO 2110
+2107 GOSUB 2150
+2108 RC%=0
+2110 NT%=Z%
+2111 LT%=Z%
+2112 RETURN
+2150 REM ---- RANDOM TYPE 1..7 INTO Z% ----
+2151 Z%=INT(RND(1)*7)+1
+2152 IF Z%>7 THEN Z%=7
+2153 RETURN
+3000 REM ---- MOVE LEFT ----
+3001 DX%=-1
+3002 DY%=0
+3003 GOSUB 3200
+3004 IF Q%=0 THEN GOSUB 3400
+3005 RETURN
+3010 REM ---- MOVE RIGHT ----
+3011 DX%=1
+3012 DY%=0
+3013 GOSUB 3200
+3014 IF Q%=0 THEN GOSUB 3400
+3015 RETURN
+3020 REM ---- SOFT DROP ----
+3021 DX%=0
+3022 DY%=1
+3023 GOSUB 3200
+3024 IF Q%=1 THEN GOTO 3030
+3025 SR=SR+LV%+1
+3026 GT%=GD%(LV%)
+3027 GOSUB 7100
+3028 RETURN
+3030 GOSUB 3450
+3031 RETURN
+3040 REM ---- HARD DROP, NO IMMEDIATE LOCK ----
+3041 GOSUB 5000
+3042 Z%=0
+3043 CY%=CY%+1
+3044 GOSUB 3300
+3045 IF Q%=0 THEN GOTO 3060
+3046 CY%=CY%-1
+3047 IF Z%>0 THEN GOSUB 3070
+3048 GOSUB 3450
+3049 RETURN
+3060 Z%=Z%+1
+3061 GOTO 3043
+3070 SR=SR+2*Z%*(LV%+1)
+3071 UP%=0
+3072 GOSUB 5100
+3073 GOSUB 7100
+3074 RETURN
+3100 REM ---- GRAVITY TICK ----
+3101 DX%=0
+3102 DY%=1
+3103 GOSUB 3200
+3104 IF Q%=1 THEN GOTO 3108
+3105 GR%=0
+3106 GT%=GD%(LV%)
+3107 RETURN
+3108 GOSUB 3450
+3109 GT%=GD%(LV%)
+3110 RETURN
+3200 REM ---- TRY MOVE BY DX% DY%, OUT Q% 0 MOVED 1 BLOCKED ----
+3201 GOSUB 5000
+3202 CX%=CX%+DX%
+3203 CY%=CY%+DY%
+3204 GOSUB 3300
+3205 IF Q%=0 THEN GOTO 3209
+3206 CX%=CX%-DX%
+3207 CY%=CY%-DY%
+3208 RETURN
+3209 IF DY%>0 THEN UP%=0
+3210 GOSUB 5100
+3211 RETURN
+3300 REM ---- COLLISION OF CURRENT STATE, OUT Q% 1 = HIT ----
+3301 SI%=(CT%-1)*4+CR%
+3302 Q%=0
+3303 FOR H%=0 TO 3
+3304 EX%=CX%+SX%(SI%,H%)
+3305 HY%=CY%+TY%(SI%,H%)
+3306 IF EX%<0 THEN Q%=1
+3307 IF EX%>=BW% THEN Q%=1
+3308 IF HY%>=BH% THEN Q%=1
+3309 IF Q%=1 THEN GOTO 3312
+3310 IF HY%<0 THEN GOTO 3312
+3311 IF BD%(EX%,HY%)>0 THEN Q%=1
+3312 NEXT H%
+3313 RETURN
+3400 REM ---- AFTER A SUCCESSFUL PLAYER ACTION ----
+3401 IF GT%<AG%(LV%) THEN GT%=AG%(LV%)
+3402 IF GR%=0 THEN RETURN
+3403 CY%=CY%+1
+3404 GOSUB 3300
+3405 CY%=CY%-1
+3406 IF Q%=1 THEN GOTO 3409
+3407 GR%=0
+3408 RETURN
+3409 IF LR%>=ML% THEN GOTO 3413
+3410 LR%=LR%+1
+3411 LK%=LD%(LV%)
+3412 RETURN
+3413 IF LK%<AG%(LV%) THEN LK%=AG%(LV%)
+3414 RETURN
+3450 REM ---- ENTER GROUNDED STATE ----
+3451 IF GR%=1 THEN RETURN
+3452 GR%=1
+3453 LK%=LD%(LV%)
+3454 LR%=0
+3455 RETURN
+4000 REM ---- TRY ROTATE CLOCKWISE WITH KICKS ----
+4001 IF NR%(CT%)=1 THEN RETURN
+4002 GOSUB 5000
+4003 W%=CR%+1
+4004 IF W%>=NR%(CT%) THEN W%=0
+4005 RX%=CX%
+4006 RY%=CY%
+4007 I%=0
+4008 CR%=W%
+4009 CX%=RX%+KX%(I%)
+4010 CY%=RY%+KY%(I%)
+4011 GOSUB 3300
+4012 IF Q%=0 THEN GOTO 4020
+4013 I%=I%+1
+4014 IF I%<KN% THEN GOTO 4008
+4015 CR%=PR%
+4016 CX%=RX%
+4017 CY%=RY%
+4018 RETURN
+4020 REM ---- ROTATION ACCEPTED WITH KICK I% ----
+4021 IF KY%(I%)<0 THEN UP%=UP%-KY%(I%)
+4022 IF AC%=1 THEN GOTO 4030
+4023 IF UP%<=0 THEN GOTO 4030
+4024 CY%=CY%+1
+4025 GOSUB 3300
+4026 IF Q%=1 THEN GOTO 4029
+4027 UP%=UP%-1
+4028 GOTO 4023
+4029 CY%=CY%-1
+4030 GOSUB 5100
+4031 GOSUB 3400
+4032 RETURN
+5000 REM ---- SNAPSHOT CURRENT PIECE AS THE OLD CELL SET ----
+5001 PT%=CT%
+5002 PR%=CR%
+5003 PX%=CX%
+5004 PY%=CY%
+5005 SI%=(PT%-1)*4+PR%
+5006 FOR I%=0 TO 3
+5007 AX%(I%)=PX%+SX%(SI%,I%)
+5008 AY%(I%)=PY%+TY%(SI%,I%)
+5009 NEXT I%
+5010 RETURN
+5100 REM ---- CLASSIC RENDER: WIPE THE PIECE, THEN PRINT IT AGAIN ----
+5101 REM THIS IS THE NAIVE WAY THE PROJECT WARNS ABOUT. IT ERASES ALL
+5102 REM FOUR OLD CELLS AND PRINTS ALL FOUR NEW ONES EVEN WHERE THEY
+5103 REM OVERLAP, SO THE PIECE BLINKS ON EVERY MOVE AND EVERY TURN.
+5104 SI%=(CT%-1)*4+CR%
+5105 FOR I%=0 TO 3
+5106 GX%=AX%(I%)
+5107 GY%=AY%(I%)
+5108 GOSUB 8100
+5109 NEXT I%
+5110 FOR I%=0 TO 3
+5111 GX%=CX%+SX%(SI%,I%)
+5112 GY%=CY%+TY%(SI%,I%)
+5113 GOSUB 8000
+5114 NEXT I%
+5115 LOCATE HX%,BY%+19
+5116 RETURN
+6000 REM ---- LOCK THE PIECE INTO THE BOARD ----
+6001 SI%=(CT%-1)*4+CR%
+6002 FOR I%=0 TO 3
+6003 X%=CX%+SX%(SI%,I%)
+6004 Y%=CY%+TY%(SI%,I%)
+6005 IF Y%>=0 THEN BD%(X%,Y%)=CT%
+6006 NEXT I%
+6007 GOSUB 6100
+6008 GOSUB 2000
+6009 RETURN
+6100 REM ---- COUNT AND REMOVE FULL ROWS ----
+6101 NC%=0
+6102 FOR Y%=0 TO BH%-1
+6103 Z%=1
+6104 FOR X%=0 TO BW%-1
+6105 IF BD%(X%,Y%)=0 THEN Z%=0
+6106 NEXT X%
+6107 IF Z%=1 THEN NC%=NC%+1
+6108 NEXT Y%
+6109 IF NC%=0 THEN RETURN
+6110 GOSUB 6120
+6111 GOSUB 6200
+6112 RETURN
+6120 REM ---- COMPACT THE WELL, REPRINT ONLY CHANGED CELLS ----
+6121 W%=BH%-1
+6122 FOR Y%=BH%-1 TO 0 STEP -1
+6123 Z%=1
+6124 FOR X%=0 TO BW%-1
+6125 IF BD%(X%,Y%)=0 THEN Z%=0
+6126 NEXT X%
+6127 IF Z%=1 THEN GOTO 6130
+6128 GOSUB 6140
+6129 W%=W%-1
+6130 NEXT Y%
+6131 IF W%<0 THEN RETURN
+6132 FOR Y%=W% TO 0 STEP -1
+6133 GOSUB 6160
+6134 NEXT Y%
+6135 RETURN
+6140 REM ---- COPY ROW Y% ONTO ROW W% ----
+6141 IF Y%=W% THEN RETURN
+6142 FOR X%=0 TO BW%-1
+6143 IF BD%(X%,W%)=BD%(X%,Y%) THEN GOTO 6150
+6144 BD%(X%,W%)=BD%(X%,Y%)
+6145 GX%=X%
+6146 GY%=W%
+6147 V%=BD%(X%,W%)
+6148 IF V%=0 THEN GOSUB 8100
+6149 IF V%>0 THEN GOSUB 8000
+6150 NEXT X%
+6151 RETURN
+6160 REM ---- BLANK ROW Y% ----
+6161 FOR X%=0 TO BW%-1
+6162 IF BD%(X%,Y%)=0 THEN GOTO 6167
+6163 BD%(X%,Y%)=0
+6164 GX%=X%
+6165 GY%=Y%
+6166 GOSUB 8100
+6167 NEXT X%
+6168 RETURN
+6200 REM ---- SCORE AND LEVEL FOR NC% ROWS ----
+6201 IF NC%=1 THEN SR=SR+100*(LV%+1)
+6202 IF NC%=2 THEN SR=SR+300*(LV%+1)
+6203 IF NC%=3 THEN SR=SR+600*(LV%+1)
+6204 IF NC%=4 THEN SR=SR+1000*(LV%+1)
+6205 LN%=LN%+NC%
+6206 Z%=INT(LN%/10)
+6207 IF Z%>LX% THEN Z%=LX%
+6208 IF Z%>LV% THEN LV%=Z%
+6209 GOSUB 7100
+6210 GOSUB 7200
+6211 RETURN
+7000 REM ---- STATIC SCREEN: WELL FRAME AND LABELS ----
+7002 CLS
+7005 LOCATE BX%-1,BY%-1
+7006 PRINT "+";
+7007 PRINT STRING$(BW%*2,"-");
+7008 PRINT "+";
+7009 FOR Y%=0 TO BH%-1
+7010 LOCATE BX%-1,BY%+Y%
+7011 PRINT "!";
+7012 LOCATE BX%+BW%*2,BY%+Y%
+7013 PRINT "!";
+7014 NEXT Y%
+7015 LOCATE BX%-1,BY%+BH%
+7016 PRINT "+";
+7017 PRINT STRING$(BW%*2,"-");
+7018 PRINT "+";
+7019 LOCATE HX%,BY%
+7020 PRINT "NEXT"
+7021 LOCATE HX%,BY%+7
+7022 PRINT "SCORE"
+7023 LOCATE HX%,BY%+10
+7024 PRINT "LEVEL"
+7025 LOCATE HX%,BY%+13
+7026 PRINT "LINES"
+7027 RETURN
+7100 REM ---- SCORE ----
+7103 LOCATE HX%,BY%+8
+7104 PRINT SR;
+7105 RETURN
+7200 REM ---- LEVEL AND LINES ----
+7203 LOCATE HX%,BY%+11
+7204 PRINT LV%;
+7205 LOCATE HX%,BY%+14
+7206 PRINT LN%;
+7207 RETURN
+7300 REM ---- NEXT PREVIEW: ERASE THE OLD PIECE, PRINT THE NEW ONE ----
+7301 IF PV%=0 THEN GOTO 7310
+7302 SI%=(PV%-1)*4
+7305 FOR I%=0 TO 3
+7306 LOCATE HX%+SX%(SI%,I%)*2,BY%+2+TY%(SI%,I%)
+7307 PRINT CE$;
+7308 NEXT I%
+7310 SI%=(NT%-1)*4
+7313 FOR I%=0 TO 3
+7314 LOCATE HX%+SX%(SI%,I%)*2,BY%+2+TY%(SI%,I%)
+7315 PRINT CB$;
+7316 NEXT I%
+7317 PV%=NT%
+7318 RETURN
+8000 REM ---- PRINT A BLOCK AT WELL CELL GX% GY% ----
+8001 IF GY%<0 THEN RETURN
+8003 LOCATE BX%+GX%*2,BY%+GY%
+8004 PRINT CB$;
+8005 DC%=DC%+1
+8006 RETURN
+8010 REM THE TEXT CURSOR SITS WHERE THE LAST PRINT ENDED, SO AFTER A
+8011 REM REDRAW IT IS PARKED IN THE EMPTY PART OF THE PANEL BY 5131.
+8100 REM ---- ERASE WELL CELL GX% GY% ----
+8101 IF GY%<0 THEN RETURN
+8102 LOCATE BX%+GX%*2,BY%+GY%
+8103 PRINT CE$;
+8104 EC%=EC%+1
+8105 RETURN
+9000 REM ---- RESET DEBUG COUNTERS ----
+9001 DC%=0
+9002 EC%=0
+9003 RETURN
+9010 REM ---- SHOW HOW MANY CELLS WERE PRINTED AND ERASED ----
+9013 LOCATE HX%,BY%+17
+9014 PRINT DC%;EC%;"  ";
+9015 RETURN
+10000 REM ================= SHAPE TABLES =================
+10001 REM PER TYPE: ROTATIONS, SPAWN COLUMN, THEN FOUR X,Y
+10002 REM PAIRS PER ROTATION. Y GROWS DOWNWARDS. ALL OFFSETS FIT A 4X4
+10003 REM BOX, SO NO HIDDEN ROWS ABOVE THE WELL ARE NEEDED.
+10004 REM T, J AND L TURN AROUND THE CELL (1,1); I, S AND Z HAVE TWO
+10005 REM ORIENTATIONS AND O HAS ONE. THE CENTRE IS CHOSEN SO THAT A
+10006 REM QUARTER TURN KEEPS AS MANY CELLS AS POSSIBLE: T KEEPS THREE.
+10010 REM I
+10011 DATA 2,3
+10012 DATA 0,1, 1,1, 2,1, 3,1
+10013 DATA 1,0, 1,1, 1,2, 1,3
+10020 REM O
+10021 DATA 1,4
+10022 DATA 0,0, 1,0, 0,1, 1,1
+10030 REM T
+10031 DATA 4,3
+10032 DATA 0,1, 1,1, 2,1, 1,2
+10033 DATA 1,0, 0,1, 1,1, 1,2
+10034 DATA 1,0, 0,1, 1,1, 2,1
+10035 DATA 1,0, 1,1, 2,1, 1,2
+10040 REM S
+10041 DATA 2,3
+10042 DATA 1,1, 2,1, 0,2, 1,2
+10043 DATA 0,0, 0,1, 1,1, 1,2
+10050 REM Z
+10051 DATA 2,3
+10052 DATA 0,1, 1,1, 1,2, 2,2
+10053 DATA 1,0, 0,1, 1,1, 0,2
+10060 REM J
+10061 DATA 4,3
+10062 DATA 0,0, 0,1, 1,1, 2,1
+10063 DATA 1,0, 2,0, 1,1, 1,2
+10064 DATA 0,1, 1,1, 2,1, 2,2
+10065 DATA 1,0, 1,1, 0,2, 1,2
+10070 REM L
+10071 DATA 4,3
+10072 DATA 2,0, 0,1, 1,1, 2,1
+10073 DATA 1,0, 1,1, 1,2, 2,2
+10074 DATA 0,1, 1,1, 2,1, 0,2
+10075 DATA 0,0, 1,0, 1,1, 1,2
+10100 REM ================= KICK OFFSETS =================
+10101 REM COUNT, THEN X,Y PAIRS TRIED IN THIS ORDER. SIDEWAYS FIRST SO
+10102 REM THAT A PIECE NEXT TO A WALL IS NOT LIFTED FOR NOTHING; THE
+10103 REM TWO CELL LIFT AT THE END IS WHAT TURNS A FLAT I UPRIGHT.
+10104 DATA 7
+10105 DATA 0,0, -1,0, 1,0, 0,-1, -2,0, 2,0, 0,-2
+10200 REM ================= TIMING TABLES =================
+10201 REM MAIN LOOP TICKS PER LEVEL 0..9. MEASURED ON THE MACHINE
+10202 REM ITSELF: THE IDLE LOOP DOES ABOUT 350 TICKS PER SECOND, SO
+10203 REM LEVEL 0 DROPS ONE ROW A SECOND AND LEVEL 9 EIGHT TIMES THAT.
+10204 DATA 350,280,225,180,145,115,90,70,55,43
+10205 REM LOCK DELAY
+10206 DATA 350,350,320,290,260,230,200,180,180,180
+10207 REM ACTION GRACE
+10208 DATA 140,140,130,130,120,120,110,110,100,100
+10300 REM ================= KEYS =================
+10301 REM COUNT, THEN KOI-7 CODE AND ACTION:
+10302 REM 1 LEFT, 2 RIGHT, 3 SOFT DROP, 4 ROTATE, 5 HARD DROP,
+10303 REM 6 PAUSE, 7 QUIT. 7 9 8 5 IS THE LAYOUT OF THE BK-0010
+10304 REM TETRIS. THE ARROW KEYS ARRIVE AS ESC PLUS A B C D AND ARE
+10305 REM HANDLED SEPARATELY AT LINE 1060.
+10306 DATA 17
+10307 DATA 65,1, 97,1
+10308 DATA 68,2, 100,2
+10309 DATA 83,3, 115,3
+10310 DATA 87,4, 119,4
+10311 DATA 32,5
+10312 DATA 80,6, 112,6
+10313 DATA 81,7, 113,7
+10314 DATA 55,1, 57,2, 53,3, 56,4</script>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ шрифт */
+/* Начертания сняты с УКНЦ: 224 знака по 8 строк, строка — байт. */
+const FONT_HEX = "000000000000000010101010101000104848900000000000004848fc48fc4848008478848484788400c2c4081020468630484830508a847a181020000000000008102020202010082010080808081020000010543854100000101010fe101010000000000000303000000000fc0000000000000000003030000204081020408078848c94a4c48478103050101010107c78848408102044fcfc081038040484780818284888fc0808fc8080f804048478788480f884848478fc840810204080807884847884848478788484847c048478000030300000303000003030000030300008102040201008000000fc00fc000000402010081020403844040810100010007884027292926c30488484fc848484f88484f8848484f87884808080808478f8444242424244f8fc8080f8808080fcfc8080f880808080788480809c84847884848484fc84848438101010101010383810101010109060848890e0a090888480808080808080fc82c6aa92828282828484c4a4948c84847884848484848478f8848484f88080807884848484849478f8848484f89088847884807804048478fe10101010101010848484848484847882828282824428108282828292aac68284844830304884848282442810101010fc040810204080fc382020202020203800804020100804023808080808080838000000fc0404000000000000000000fc3010080000000000000078047c84847a8080b8c48484c4b800007884808084780404748c84848c740000788484fc807c18242070202020200000748c84848c748080b8c4848484841000301010101038100010101010101080808890e090888430101010101010380000ec92929292920000b8c48484848400007884848484780000b8c48484c4b80000748c84848c740000b8c480808080000078807804847820207020202024180000848484848c740000828282442810000082828292926c000084483030488400008484844830200000fc08102040fc000c10106010100c0010101010101010006010100c101060000000000000000000000000000000002070a820202020202020202021a8702000004080ff80400000000804fe0408000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000442810284400000010007c001000000000000000000000000000000000000404042444fc40200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000050505050d150505020202020fe000000505050505f50505000000000e02020205050505050505050202020203e202020202020203e0000005050505e405e50500000007f405f5050202020fe00fe2020000000003f20202000000001fe212020505050de01fe000050505050ff00000020202021e0212020505050de01de505020202020fe2020202020203e213e202050505050df50505000000001fe515050202020fe01fe000000000000fe0000005050505e407e00002020202120212020000000fe01fe202020202021e0010000000000ff00ff0000505050d110d15050505050d110f10000000000ff00df5050202020e120e12020000000f010d0505000008c9292f2928c000078047c84847a047880f88484847800008888888888fc00001c24444444fe0000788484fc807c0000107c9292927c0000fc848080808000008448303048840000848c94a4c4843000848c94a4c4840000848890f0888400001c2444444484000082c6aa9282820000848484fc848400007884848484780000fc848484848400007c84847c44840000b8c48484c4b800007884808084780000fe1010101010000084848448302000009254383854920000f884f88484f800008080f88484f800008282f28a8af2000078043804047800009292929292fe0000f804047c04f800009292929292fe00008585847c04040000c0407c42427c8c929292f292928c30488484fc848484fc8080f8848484f884848484848484fe1c244444444444fefc8080f8808080fc107c929292927c10fc84808080808080848448303048848484848c94a4c4848484848c94a4c48484848890e0908884821c2444444444448482c6aa9282828282848484fc848484847884848484848478fc848484848484847c8484847c244484f8848484f88080807884808080808478fe92101010101010848484847c0484789292543854929292f88484f8848484f8808080f8848484f8828282f28a8a8af2788404380404847892929292929292fe788402023e02847892929292929292fe858584847c040404c040407c4242427c";
+const FONT = new Uint8Array(FONT_HEX.length / 2);
+for (let i = 0; i < FONT.length; i++) FONT[i] = parseInt(FONT_HEX.substr(i * 2, 2), 16);
+
+const COLS = 64, ROWS = 24, CW = 8, CHH = 11, GH = 8;
+
+/* ------------------------------------------------------------------ экран */
+class Screen {
+  constructor() {
+    this.cells = new Uint8Array(COLS * ROWS).fill(32);
+    this.col = 0;
+    this.row = 0;
+    this.dirty = true;
+  }
+  cls() {
+    this.cells.fill(32);
+    this.col = 0;
+    this.row = 0;
+    this.dirty = true;
+  }
+  locate(col, row) {
+    if (col < 0 || col >= COLS) throw new BasicError("LOCATE: столбец " + col + " вне 0..63");
+    if (row < 0 || row >= ROWS) throw new BasicError("LOCATE: строка " + row + " вне 0..23");
+    this.col = col;
+    this.row = row;
+  }
+  write(text) {
+    for (const ch of text) {
+      if (this.col >= COLS) this.newline();
+      this.cells[this.row * COLS + this.col] = koi7(ch);
+      this.col++;
+    }
+    this.dirty = true;
+  }
+  newline() {
+    this.col = 0;
+    this.row++;
+    if (this.row >= ROWS) this.scroll();
+    this.dirty = true;
+  }
+  scroll() {
+    this.cells.copyWithin(0, COLS);
+    this.cells.fill(32, COLS * (ROWS - 1));
+    this.row = ROWS - 1;
+  }
+}
+
+/* КОИ-7: латиница и знаки идут как ASCII, кириллица — своим блоком. */
+const CYR = "ЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧЪ";
+function koi7(ch) {
+  const code = ch.codePointAt(0);
+  if (code < 128) return code;
+  const upper = ch.toUpperCase();
+  const idx = CYR.indexOf(upper);
+  if (idx >= 0) return 224 + idx;
+  return 63;
+}
+
+/* --------------------------------------------------------------- разборщик */
+class BasicError extends Error {}
+
+const KEYWORDS = new Set(["REM", "LET", "IF", "THEN", "ELSE", "GOTO", "GOSUB", "RETURN",
+  "FOR", "TO", "STEP", "NEXT", "READ", "DATA", "RESTORE", "DIM", "END", "STOP", "PRINT",
+  "COLOR", "CLS", "LOCATE", "BEEP", "ON", "AND", "OR", "NOT", "LIST", "RUN", "NEW"]);
+const FUNCS = new Set(["INT", "ABS", "RND", "SGN", "ASC", "LEN", "SQR", "CHR", "STRING", "INKEY"]);
+
+const TOKEN_RE = /\s+|\d+\.\d*|\.\d+|\d+|"[^"]*"|[A-Z][A-Z0-9]*[%!#$]?|<>|<=|>=|[-+*/^=<>(),:;]/gy;
+
+function tokenize(text) {
+  const out = [];
+  let pos = 0;
+  while (pos < text.length) {
+    TOKEN_RE.lastIndex = pos;
+    const m = TOKEN_RE.exec(text);
+    if (!m) throw new BasicError("непонятный символ «" + text[pos] + "»");
+    pos = TOKEN_RE.lastIndex;
+    const s = m[0];
+    if (/^\s/.test(s)) continue;
+    if (/^\d|^\./.test(s)) out.push({ k: "num", t: s, v: parseFloat(s) });
+    else if (s[0] === '"') out.push({ k: "str", t: s, v: s.slice(1, -1) });
+    else if (/^[A-Z]/.test(s)) out.push({ k: KEYWORDS.has(s) ? "kw" : "name", t: s });
+    else out.push({ k: "op", t: s });
+    if (out.length && out[out.length - 1].t === "REM") break;
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------ интерпретатор */
+class Basic {
+  constructor(source) {
+    this.load(source);
+    this.reset();
+  }
+
+  load(source) {
+    this.lines = [];
+    this.index = new Map();
+    for (const raw of source.split("\n")) {
+      const line = raw.trim();
+      if (!line) continue;
+      this.addLine(line);
+    }
+    this.sortLines();
+  }
+
+  addLine(raw) {
+    const m = /^(\d+)\s?(.*)$/.exec(raw);
+    if (!m) throw new BasicError("строка без номера: " + raw);
+    const number = parseInt(m[1], 10);
+    const body = m[2];
+    if (raw.length > 255) throw new BasicError("строка " + number + " длиннее 255 символов");
+    const tokens = tokenize(body);
+    for (const t of tokens) {
+      if (t.k === "op" && t.t === ":") {
+        throw new BasicError("строка " + number +
+          ": двоеточия эта система не знает, нужен один оператор в строке");
+      }
+    }
+    const at = this.lines.findIndex(l => l.number === number);
+    const rec = { number, tokens, source: body };
+    if (at >= 0) {
+      if (!body) this.lines.splice(at, 1); else this.lines[at] = rec;
+    } else if (body) {
+      this.lines.push(rec);
+    }
+  }
+
+  sortLines() {
+    this.lines.sort((a, b) => a.number - b.number);
+    this.index = new Map(this.lines.map((l, i) => [l.number, i]));
+    this.collectData();
+  }
+
+  collectData() {
+    this.data = [];
+    for (const line of this.lines) {
+      const t = line.tokens;
+      if (!t.length || t[0].t !== "DATA") continue;
+      for (let i = 1; i < t.length; i++) {
+        if (t[i].k === "op" && t[i].t === ",") continue;
+        if (t[i].k === "op" && t[i].t === "-") { this.data.push(-t[++i].v); continue; }
+        this.data.push(t[i].k === "num" ? t[i].v : t[i].v !== undefined ? t[i].v : t[i].t);
+      }
+    }
+  }
+
+  reset() {
+    this.vars = new Map();
+    this.arrays = new Map();
+    this.screen = new Screen();
+    this.keys = [];
+    this.dataPos = 0;
+    this.callStack = [];
+    this.forStack = [];
+    this.pc = null;
+    this.running = false;
+    this.steps = 0;
+  }
+
+  canon(name) {
+    const suffix = "%!#$".includes(name[name.length - 1]) ? name[name.length - 1] : "";
+    const base = suffix ? name.slice(0, -1) : name;
+    return base.slice(0, 2) + suffix;
+  }
+
+  getVar(name) {
+    const key = this.canon(name);
+    if (this.vars.has(key)) return this.vars.get(key);
+    return key.endsWith("$") ? "" : 0;
+  }
+
+  setVar(name, value) {
+    const key = this.canon(name);
+    if (key.endsWith("%")) {
+      value = Math.round(value);
+      if (value < -32768 || value > 32767) throw new BasicError("переполнение целого в " + name);
+    }
+    this.vars.set(key, value);
+  }
+
+  dim(name, sizes) {
+    let total = 1;
+    for (const s of sizes) total *= s + 1;
+    this.arrays.set(this.canon(name), { dims: sizes, data: new Array(total).fill(0) });
+  }
+
+  arrayOf(name) {
+    const key = this.canon(name);
+    if (!this.arrays.has(key)) this.dim(name, [10]);
+    return this.arrays.get(key);
+  }
+
+  offset(arr, idx, name) {
+    if (idx.length !== arr.dims.length) throw new BasicError(name + ": не столько индексов");
+    let off = 0;
+    for (let i = 0; i < idx.length; i++) {
+      if (idx[i] < 0 || idx[i] > arr.dims[i]) throw new BasicError(name + ": индекс вне массива");
+      off = off * (arr.dims[i] + 1) + idx[i];
+    }
+    return off;
+  }
+
+  getArray(name, idx) {
+    const arr = this.arrayOf(name);
+    return arr.data[this.offset(arr, idx, name)];
+  }
+
+  setArray(name, idx, value) {
+    const arr = this.arrayOf(name);
+    if (this.canon(name).endsWith("%")) value = Math.round(value);
+    arr.data[this.offset(arr, idx, name)] = value;
+  }
+
+  /* ------------------------------------------------------------ выражения */
+  expr(t, i) { return this.orExpr(t, i); }
+
+  orExpr(t, i) {
+    let [v, j] = this.andExpr(t, i);
+    while (j < t.length && t[j].t === "OR") {
+      const [r, k] = this.andExpr(t, j + 1);
+      v = (v || r) ? -1 : 0; j = k;
+    }
+    return [v, j];
+  }
+
+  andExpr(t, i) {
+    let [v, j] = this.notExpr(t, i);
+    while (j < t.length && t[j].t === "AND") {
+      const [r, k] = this.notExpr(t, j + 1);
+      v = (v && r) ? -1 : 0; j = k;
+    }
+    return [v, j];
+  }
+
+  notExpr(t, i) {
+    if (i < t.length && t[i].t === "NOT") {
+      const [v, j] = this.notExpr(t, i + 1);
+      return [v ? 0 : -1, j];
+    }
+    return this.relExpr(t, i);
+  }
+
+  relExpr(t, i) {
+    let [v, j] = this.addExpr(t, i);
+    while (j < t.length && t[j].k === "op" && ["=", "<>", "<", ">", "<=", ">="].includes(t[j].t)) {
+      const op = t[j].t;
+      const [r, k] = this.addExpr(t, j + 1);
+      let res;
+      if (op === "=") res = v === r;
+      else if (op === "<>") res = v !== r;
+      else if (op === "<") res = v < r;
+      else if (op === ">") res = v > r;
+      else if (op === "<=") res = v <= r;
+      else res = v >= r;
+      v = res ? -1 : 0; j = k;
+    }
+    return [v, j];
+  }
+
+  addExpr(t, i) {
+    let [v, j] = this.mulExpr(t, i);
+    while (j < t.length && t[j].k === "op" && (t[j].t === "+" || t[j].t === "-")) {
+      const op = t[j].t;
+      const [r, k] = this.mulExpr(t, j + 1);
+      v = op === "+" ? v + r : v - r; j = k;
+    }
+    return [v, j];
+  }
+
+  mulExpr(t, i) {
+    let [v, j] = this.unary(t, i);
+    while (j < t.length && t[j].k === "op" && (t[j].t === "*" || t[j].t === "/")) {
+      const op = t[j].t;
+      const [r, k] = this.unary(t, j + 1);
+      if (op === "/" && r === 0) throw new BasicError("деление на ноль");
+      v = op === "*" ? v * r : v / r; j = k;
+    }
+    return [v, j];
+  }
+
+  unary(t, i) {
+    if (i < t.length && t[i].k === "op" && (t[i].t === "-" || t[i].t === "+")) {
+      const sign = t[i].t;
+      const [v, j] = this.unary(t, i + 1);
+      return [sign === "-" ? -v : v, j];
+    }
+    return this.atom(t, i);
+  }
+
+  atom(t, i) {
+    if (i >= t.length) throw new BasicError("выражение оборвано");
+    const tok = t[i];
+    if (tok.k === "num" || tok.k === "str") return [tok.v, i + 1];
+    if (tok.k === "op" && tok.t === "(") {
+      const [v, j] = this.expr(t, i + 1);
+      if (t[j].t !== ")") throw new BasicError("ожидалась скобка");
+      return [v, j + 1];
+    }
+    if (tok.k === "name") {
+      const name = tok.t;
+      const base = "%!#$".includes(name[name.length - 1]) ? name.slice(0, -1) : name;
+      if (base === "INKEY" && name.endsWith("$")) return [this.keys.length ? this.keys.shift() : "", i + 1];
+      if (FUNCS.has(base)) return this.callFunc(base, t, i + 1);
+      if (i + 1 < t.length && t[i + 1].t === "(") {
+        const [idx, j] = this.indexList(t, i + 1);
+        return [this.getArray(name, idx), j];
+      }
+      return [this.getVar(name), i + 1];
+    }
+    throw new BasicError("неожиданное «" + tok.t + "»");
+  }
+
+  indexList(t, i) {
+    const idx = [];
+    i++;
+    for (;;) {
+      const [v, j] = this.expr(t, i);
+      idx.push(Math.trunc(v));
+      i = j;
+      if (t[i].t === ",") { i++; continue; }
+      if (t[i].t === ")") return [idx, i + 1];
+      throw new BasicError("ожидалась запятая или скобка");
+    }
+  }
+
+  argList(t, i) {
+    const args = [];
+    i++;
+    for (;;) {
+      const [v, j] = this.expr(t, i);
+      args.push(v);
+      i = j;
+      if (t[i].t === ",") { i++; continue; }
+      if (t[i].t === ")") return [args, i + 1];
+      throw new BasicError("ожидалась запятая или скобка");
+    }
+  }
+
+  callFunc(base, t, i) {
+    let args = [];
+    if (i < t.length && t[i].t === "(") [args, i] = this.argList(t, i);
+    switch (base) {
+      case "RND":
+        if (!args.length) throw new BasicError("RND без аргумента: нужно RND(X)");
+        return [Math.random(), i];
+      case "INT": return [Math.floor(args[0]), i];
+      case "ABS": return [Math.abs(args[0]), i];
+      case "SGN": return [Math.sign(args[0]), i];
+      case "SQR": return [Math.sqrt(args[0]), i];
+      case "LEN": return [String(args[0]).length, i];
+      case "ASC":
+        if (!args.length || args[0] === "") throw new BasicError("ASC от пустой строки");
+        return [koi7(String(args[0])[0]), i];
+      case "CHR": return [String.fromCharCode(args[0]), i];
+      case "STRING": return [String(args[1]).repeat(Math.trunc(args[0])), i];
+    }
+    throw new BasicError("нет функции " + base);
+  }
+
+  /* -------------------------------------------------------------- операторы */
+  static format(value) {
+    if (typeof value === "string") return value;
+    let text;
+    if (Number.isInteger(value)) text = String(value);
+    else text = String(Math.round(value * 1e6) / 1e6);
+    return (value >= 0 ? " " + text : text) + " ";
+  }
+
+  start(lineNumber) {
+    const li = lineNumber === undefined ? 0 : this.resolve(lineNumber);
+    this.pc = [li, 0];
+    this.running = true;
+  }
+
+  resolve(number) {
+    if (this.index.has(number)) return this.index.get(number);
+    for (let i = 0; i < this.lines.length; i++) if (this.lines[i].number >= number) return i;
+    throw new BasicError("нет строки " + number);
+  }
+
+  step() {
+    if (!this.running || !this.pc) return false;
+    const [li, ti] = this.pc;
+    if (li >= this.lines.length) { this.running = false; return false; }
+    const toks = this.lines[li].tokens;
+    if (ti >= toks.length) { this.pc = [li + 1, 0]; return true; }
+    this.steps++;
+    try {
+      this.exec(toks, ti, li);
+    } catch (err) {
+      if (err instanceof BasicError) {
+        err.line = this.lines[li].number;
+        this.running = false;
+      }
+      throw err;
+    }
+    return this.running;
+  }
+
+  next(li) { this.pc = [li + 1, 0]; }
+
+  exec(t, i, li) {
+    const tok = t[i];
+    const w = tok.k === "kw" ? tok.t : null;
+    if (w === "REM" || w === "DATA") return this.next(li);
+    if (w === "END" || w === "STOP") { this.running = false; return; }
+    if (w === "LET") return this.assign(t, i + 1, li);
+    if (w === "GOTO") {
+      const [target] = this.expr(t, i + 1);
+      this.pc = [this.resolve(Math.trunc(target)), 0];
+      return;
+    }
+    if (w === "GOSUB") {
+      const [target, j] = this.expr(t, i + 1);
+      this.callStack.push([li + 1, 0]);
+      this.pc = [this.resolve(Math.trunc(target)), 0];
+      if (j < t.length && t[j].t !== ";") { /* хвост игнорируем */ }
+      return;
+    }
+    if (w === "RETURN") {
+      if (!this.callStack.length) throw new BasicError("RETURN без GOSUB");
+      this.pc = this.callStack.pop();
+      return;
+    }
+    if (w === "IF") return this.ifStatement(t, i + 1, li);
+    if (w === "FOR") return this.forStatement(t, i + 1, li);
+    if (w === "NEXT") return this.nextStatement(t, i + 1, li);
+    if (w === "DIM") return this.dimStatement(t, i + 1, li);
+    if (w === "READ") return this.readStatement(t, i + 1, li);
+    if (w === "RESTORE") { this.dataPos = 0; return this.next(li); }
+    if (w === "PRINT") return this.printStatement(t, i + 1, li);
+    if (w === "LOCATE") {
+      const [col, j] = this.expr(t, i + 1);
+      if (t[j].t !== ",") throw new BasicError("LOCATE ждёт столбец и строку");
+      const [row, k] = this.expr(t, j + 1);
+      this.screen.locate(Math.trunc(col), Math.trunc(row));
+      return this.next(li);
+    }
+    if (w === "CLS") { this.screen.cls(); return this.next(li); }
+    if (w === "COLOR" || w === "BEEP") { return this.next(li); }
+    if (w === "ON") return this.onStatement(t, i + 1, li);
+    if (tok.k === "name") return this.assign(t, i, li);
+    throw new BasicError("непонятный оператор «" + tok.t + "»");
+  }
+
+  assign(t, i, li) {
+    const name = t[i].t;
+    if (t[i].k !== "name") throw new BasicError("слева от = ожидалось имя");
+    if (i + 1 < t.length && t[i + 1].t === "(") {
+      const [idx, j] = this.indexList(t, i + 1);
+      if (t[j].t !== "=") throw new BasicError("ожидалось =");
+      const [v] = this.expr(t, j + 1);
+      this.setArray(name, idx, v);
+    } else {
+      if (t[i + 1] === undefined || t[i + 1].t !== "=") throw new BasicError("ожидалось =");
+      const [v] = this.expr(t, i + 2);
+      this.setVar(name, v);
+    }
+    this.next(li);
+  }
+
+  ifStatement(t, i, li) {
+    const [cond, j] = this.expr(t, i);
+    if (t[j] === undefined || t[j].t !== "THEN") throw new BasicError("ожидалось THEN");
+    if (!cond) return this.next(li);
+    const k = j + 1;
+    if (t[k].k === "num") { this.pc = [this.resolve(t[k].v), 0]; return; }
+    this.pc = [li, k];
+  }
+
+  forStatement(t, i, li) {
+    const name = t[i].t;
+    if (t[i + 1].t !== "=") throw new BasicError("ожидалось = в FOR");
+    const [start, j] = this.expr(t, i + 2);
+    if (t[j].t !== "TO") throw new BasicError("ожидалось TO");
+    let [limit, k] = this.expr(t, j + 1);
+    let stepValue = 1;
+    if (k < t.length && t[k].t === "STEP") { const r = this.expr(t, k + 1); stepValue = r[0]; k = r[1]; }
+    this.setVar(name, start);
+    this.forStack.push({ name: this.canon(name), limit, step: stepValue, body: [li + 1, 0] });
+    if ((stepValue > 0 && start > limit) || (stepValue < 0 && start < limit)) {
+      this.forStack.pop();
+      this.skipToNext(li);
+      return;
+    }
+    this.next(li);
+  }
+
+  skipToNext(li) {
+    let depth = 0;
+    for (let idx = li + 1; idx < this.lines.length; idx++) {
+      const toks = this.lines[idx].tokens;
+      for (const tk of toks) {
+        if (tk.t === "FOR") depth++;
+        else if (tk.t === "NEXT") {
+          if (depth === 0) { this.pc = [idx + 1, 0]; return; }
+          depth--;
+        }
+      }
+    }
+    throw new BasicError("не найден NEXT");
+  }
+
+  nextStatement(t, i, li) {
+    const frame = this.forStack[this.forStack.length - 1];
+    if (!frame) throw new BasicError("NEXT без FOR");
+    if (i < t.length && t[i].k === "name" && this.canon(t[i].t) !== frame.name) {
+      throw new BasicError("NEXT " + t[i].t + " не к тому FOR");
+    }
+    let value = (this.vars.get(frame.name) || 0) + frame.step;
+    if (frame.name.endsWith("%")) value = Math.round(value);
+    this.vars.set(frame.name, value);
+    if ((frame.step > 0 && value <= frame.limit) || (frame.step < 0 && value >= frame.limit)) {
+      this.pc = frame.body;
+      return;
+    }
+    this.forStack.pop();
+    this.next(li);
+  }
+
+  dimStatement(t, i, li) {
+    for (;;) {
+      const name = t[i].t;
+      const [idx, j] = this.indexList(t, i + 1);
+      this.dim(name, idx);
+      i = j;
+      if (i < t.length && t[i].t === ",") { i++; continue; }
+      break;
+    }
+    this.next(li);
+  }
+
+  readStatement(t, i, li) {
+    for (;;) {
+      const name = t[i].t;
+      if (this.dataPos >= this.data.length) throw new BasicError("данные кончились");
+      const value = this.data[this.dataPos++];
+      if (i + 1 < t.length && t[i + 1].t === "(") {
+        const [idx, j] = this.indexList(t, i + 1);
+        this.setArray(name, idx, value);
+        i = j;
+      } else {
+        this.setVar(name, value);
+        i++;
+      }
+      if (i < t.length && t[i].t === ",") { i++; continue; }
+      break;
+    }
+    this.next(li);
+  }
+
+  onStatement(t, i, li) {
+    const [value, j] = this.expr(t, i);
+    const kind = t[j].t;
+    if (kind !== "GOTO" && kind !== "GOSUB") throw new BasicError("после ON нужен GOTO или GOSUB");
+    const targets = [];
+    let k = j + 1;
+    for (;;) {
+      targets.push(t[k].v);
+      k++;
+      if (k < t.length && t[k].t === ",") { k++; continue; }
+      break;
+    }
+    const n = Math.trunc(value);
+    if (n < 1 || n > targets.length) return this.next(li);
+    if (kind === "GOSUB") this.callStack.push([li + 1, 0]);
+    this.pc = [this.resolve(targets[n - 1]), 0];
+  }
+
+  printStatement(t, i, li) {
+    let newline = true;
+    let j = i;
+    while (j < t.length) {
+      if (t[j].t === ";") { newline = false; j++; continue; }
+      if (t[j].t === ",") {
+        this.screen.write(" ".repeat(14 - (this.screen.col % 14)));
+        newline = false; j++; continue;
+      }
+      const [value, k] = this.expr(t, j);
+      this.screen.write(Basic.format(value));
+      newline = true;
+      j = k;
+    }
+    if (newline) this.screen.newline();
+    this.next(li);
+  }
+}
+
+/* ------------------------------------------------------------------- пульт */
+const SOURCES = {
+  diff: document.getElementById("src-diff").textContent.trim(),
+  classic: document.getElementById("src-classic").textContent.trim(),
+};
+
+const canvas = document.getElementById("screen");
+const ctx = canvas.getContext("2d", { alpha: false });
+const listing = document.getElementById("listing");
+const msg = document.getElementById("msg");
+const lamp = document.getElementById("lamp");
+const drawnEl = document.getElementById("drawn");
+const erasedEl = document.getElementById("erased");
+const lastMoveEl = document.getElementById("last-move");
+const speedEl = document.getElementById("speed");
+
+let machine = null;
+let program = "diff";
+let inputLine = "";
+let lastCounters = [0, 0];
+let cursorOn = true;
+
+const BANNER = [
+  "БЕЙСИК УК-НЦ КАССЕТНЫЙ",
+  "ВИЛЬНЮС, 1988.09.28",
+  "",
+];
+
+function say(text, kind) {
+  msg.textContent = text || "";
+  msg.dataset.kind = kind || "";
+}
+
+function boot() {
+  machine = new Basic(SOURCES[program]);
+  listing.value = SOURCES[program];
+  for (const line of BANNER) { machine.screen.write(line); machine.screen.newline(); }
+  prompt();
+  lastCounters = [0, 0];
+  updateCounters(true);
+  say("Программа в памяти. Наберите RUN и нажмите ввод.");
+  setLamp("idle");
+}
+
+function prompt() {
+  machine.screen.write("Ok");
+  machine.screen.newline();
+  inputLine = "";
+}
+
+function setLamp(state) {
+  lamp.dataset.state = state;
+  lamp.textContent = state === "run" ? "работа" : "готов";
+}
+
+function updateCounters(force) {
+  const drawn = machine.getVar("DC%");
+  const erased = machine.getVar("EC%");
+  if (!force && drawn === lastCounters[0] && erased === lastCounters[1]) return;
+  const dd = drawn - lastCounters[0], de = erased - lastCounters[1];
+  drawnEl.textContent = drawn;
+  erasedEl.textContent = erased;
+  if (!force && (dd || de)) lastMoveEl.textContent = "+" + dd + " / −" + de;
+  lastCounters = [drawn, erased];
+}
+
+/* ------------------------------------------------------------- отрисовка */
+function draw() {
+  const img = ctx.createImageData(COLS * CW, ROWS * CHH);
+  const px = img.data;
+  const bg = [216, 28, 0];
+  const ink = [255, 255, 255];
+  for (let i = 0; i < px.length; i += 4) {
+    px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; px[i + 3] = 255;
+  }
+  const width = COLS * CW;
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const code = machine.screen.cells[row * COLS + col];
+      if (code === 32) continue;
+      const g = (code - 32) * 8;
+      if (g < 0 || g + 8 > FONT.length) continue;
+      for (let dy = 0; dy < GH; dy++) {
+        const bits = FONT[g + dy];
+        if (!bits) continue;
+        const y = row * CHH + dy;
+        for (let dx = 0; dx < 8; dx++) {
+          if (!(bits & (0x80 >> dx))) continue;
+          const o = ((y * width) + col * CW + dx) * 4;
+          px[o] = ink[0]; px[o + 1] = ink[1]; px[o + 2] = ink[2];
+        }
+      }
+    }
+  }
+  if (!machine.running && cursorOn) {
+    const y0 = machine.screen.row * CHH, x0 = machine.screen.col * CW;
+    for (let dy = 0; dy < GH; dy++) {
+      for (let dx = 0; dx < CW; dx++) {
+        const o = (((y0 + dy) * width) + x0 + dx) * 4;
+        px[o] = 255; px[o + 1] = 255; px[o + 2] = 255;
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* ------------------------------------------------------------- главный цикл */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  cursorOn = Math.floor(now / 400) % 2 === 0;
+  if (machine.running) {
+    const budget = Math.max(1, Math.round(parseInt(speedEl.value, 10) * dt));
+    try {
+      for (let i = 0; i < budget; i++) if (!machine.step()) break;
+    } catch (err) {
+      machine.running = false;
+      machine.screen.newline();
+      machine.screen.write("ОШИБКА В СТРОКЕ " + (err.line || "?"));
+      machine.screen.newline();
+      prompt();
+      say(err.message + (err.line ? " (строка " + err.line + ")" : ""), "bad");
+      setLamp("idle");
+    }
+    if (!machine.running) { prompt(); setLamp("idle"); }
+    updateCounters(false);
+  }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* --------------------------------------------------------------- клавиши */
+const ARROWS = { ArrowUp: "A", ArrowDown: "B", ArrowRight: "C", ArrowLeft: "D" };
+
+canvas.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (machine.running) {
+    if (ARROWS[e.key]) {
+      machine.keys.push("\x1b", ARROWS[e.key]);
+      e.preventDefault();
+      return;
+    }
+    if (e.key.length === 1) { machine.keys.push(e.key.toUpperCase()); e.preventDefault(); }
+    if (e.key === "Escape") { machine.running = false; prompt(); setLamp("idle"); e.preventDefault(); }
+    return;
+  }
+  if (e.key === "Enter") { submitLine(); e.preventDefault(); return; }
+  if (e.key === "Backspace") {
+    if (inputLine.length) {
+      inputLine = inputLine.slice(0, -1);
+      machine.screen.col = Math.max(0, machine.screen.col - 1);
+      machine.screen.cells[machine.screen.row * COLS + machine.screen.col] = 32;
+    }
+    e.preventDefault();
+    return;
+  }
+  if (e.key.length === 1) {
+    const ch = e.key.toUpperCase();
+    inputLine += ch;
+    machine.screen.write(ch);
+    e.preventDefault();
+  }
+});
+
+canvas.addEventListener("click", () => canvas.focus());
+
+function submitLine() {
+  const text = inputLine.trim();
+  machine.screen.newline();
+  inputLine = "";
+  if (!text) { prompt(); return; }
+  try {
+    if (/^\d/.test(text)) {
+      machine.addLine(text);
+      machine.sortLines();
+      listing.value = machine.lines.map(l => l.number + " " + l.source).join("\n");
+      prompt();
+      return;
+    }
+    const cmd = text.toUpperCase();
+    if (cmd === "RUN") { startRun(); return; }
+    if (cmd === "LIST") {
+      for (const line of machine.lines) {
+        machine.screen.write(line.number + " " + line.source);
+        machine.screen.newline();
+      }
+      prompt();
+      return;
+    }
+    if (cmd === "NEW") {
+      machine.lines = []; machine.sortLines(); listing.value = "";
+      prompt();
+      return;
+    }
+    if (cmd === "CLS") { machine.screen.cls(); prompt(); return; }
+    runImmediate(text);
+  } catch (err) {
+    machine.screen.write("ОШИБКА");
+    machine.screen.newline();
+    prompt();
+    say(err.message, "bad");
+  }
+}
+
+function runImmediate(text) {
+  const tokens = tokenize(text);
+  const holder = { number: 0, tokens, source: text };
+  machine.lines.unshift(holder);
+  machine.sortLines();
+  try {
+    machine.pc = [machine.index.get(0), 0];
+    machine.running = true;
+    let guard = 200000;
+    while (machine.running && guard-- > 0) {
+      const [li] = machine.pc;
+      if (li !== machine.index.get(0)) break;
+      machine.step();
+    }
+  } finally {
+    machine.running = false;
+    machine.lines = machine.lines.filter(l => l !== holder);
+    machine.sortLines();
+    prompt();
+  }
+}
+
+function startRun() {
+  machine.reset();
+  machine.screen.cls();
+  machine.start();
+  lastCounters = [0, 0];
+  updateCounters(true);
+  setLamp("run");
+  say("Идёт программа. Escape или Q — выход.");
+  canvas.focus();
+}
+
+/* ----------------------------------------------------------------- кнопки */
+document.getElementById("run").addEventListener("click", () => {
+  if (!machine.lines.length) { say("В памяти пусто: запишите листинг.", "bad"); return; }
+  startRun();
+});
+
+document.getElementById("stop").addEventListener("click", () => {
+  if (!machine.running) return;
+  machine.running = false;
+  prompt();
+  setLamp("idle");
+  say("Остановлено. Наберите RUN, чтобы начать заново.");
+});
+
+document.getElementById("reset").addEventListener("click", () => {
+  boot();
+});
+
+document.getElementById("load").addEventListener("click", () => {
+  try {
+    const fresh = new Basic(listing.value);
+    machine = fresh;
+    machine.screen.cls();
+    machine.screen.write("ПРОГРАММА ЗАПИСАНА, СТРОК " + machine.lines.length);
+    machine.screen.newline();
+    prompt();
+    setLamp("idle");
+    say("Записано строк: " + machine.lines.length + ". Наберите RUN.");
+  } catch (err) {
+    say(err.message, "bad");
+  }
+});
+
+document.getElementById("restore").addEventListener("click", () => {
+  listing.value = SOURCES[program];
+  say("Листинг вернулся к исходному. Нажмите «Записать в память».");
+});
+
+for (const radio of document.querySelectorAll('input[name="prog"]')) {
+  radio.addEventListener("change", () => {
+    program = radio.value;
+    boot();
+    say(program === "diff"
+      ? "В памяти немигающая версия: перепечатывается только разница."
+      : "В памяти мигающая версия: фигура стирается целиком и печатается заново.");
+  });
+}
+
+boot();
+requestAnimationFrame(frame);
+</script>
