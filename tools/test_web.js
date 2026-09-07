@@ -138,16 +138,20 @@ test("партия идёт: стакан нарисован, фигура па�
   b.start();
   let guard = 400000;
   while (b.running && guard-- > 0) b.step();
-  const rows = [];
+  const cells = b.screen.cells;
+  const walls = [...cells].filter(c => c === 164).length;   // двойная вертикаль
+  const floor = [...cells].filter(c => c === 186).length;   // двойная горизонталь
+  const blocks = [...cells].filter(c => c === 79).length;   // пустой квадрат
+  let text = "";
   for (let r = 0; r < 24; r++) {
-    let line = "";
-    for (let c = 0; c < 64; c++) line += String.fromCharCode(b.screen.cells[r * 64 + c]);
-    rows.push(line.replace(/\s+$/, ""));
+    for (let c = 0; c < 64; c++) text += String.fromCharCode(cells[r * 64 + c]);
+    text += "\n";
   }
-  const text = rows.join("\n");
-  assert(text.includes("+--------------------+"), "нет рамки стакана:\n" + text);
+  assert(walls >= 40, "стены стакана не нарисованы: " + walls);
+  assert(floor === 20, "пол стакана не из двадцати знаков: " + floor);
   assert(text.includes("SCORE"), "нет панели");
-  assert(text.includes("[]"), "нет ни одной фигуры");
+  assert(blocks >= 4, "нет ни одной фигуры");
+  assert(!text.includes("+---"), "верхняя планка всё ещё рисуется");
   assert(b.running, "игра остановилась сама, хотя должна крутиться");
 });
 
@@ -158,15 +162,9 @@ test("широкий режим: клетка в один знак, стакан
   b.start();
   let guard = 400000;
   while (b.running && guard-- > 0) b.step();
-  const rows = [];
-  for (let r = 0; r < 24; r++) {
-    let line = "";
-    for (let c = 0; c < 64; c++) line += String.fromCharCode(b.screen.cells[r * 64 + c]);
-    rows.push(line.replace(/\s+$/, ""));
-  }
-  const text = rows.join("\n");
-  assert(text.includes("+----------+"), "рамка стакана не сузилась до десяти знаков:\n" + text);
-  assert(text.includes("#"), "нет клетки в один знак");
+  const floor = [...b.screen.cells].filter(c => c === 186).length;
+  assert(floor === 10, "пол стакана не сузился до десяти знаков: " + floor);
+  assert([...b.screen.cells].filter(c => c === 79).length >= 4, "нет клетки в один знак");
 });
 
 test("двоеточие как разделитель операторов отвергается", () => {

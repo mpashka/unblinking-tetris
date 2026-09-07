@@ -331,7 +331,7 @@ def t_rotation_blocked():
     assert counters(b) == (0, 0)
 
 
-@test("hard drop опускает до упора, даёт очки и не фиксирует фигуру")
+@test("hard drop опускает до упора, даёт очки и держит половинное окно")
 def t_hard_drop():
     b = boot()
     place(b, 3, 0, 4, 0)
@@ -341,7 +341,8 @@ def t_hard_drop():
     assert max(y for _, y in cells) == 19, cells
     assert b.get_var("SR") == 2 * 17 * 1, b.get_var("SR")
     assert b.get_var("GR%") == 1, "hard drop не включил grounded"
-    assert b.get_var("LK%") == b.get_array("LD%", [0]), "нет окна манёвра"
+    # после сброса окно манёвра вдвое короче обычного: фигура уже лежит
+    assert b.get_var("LK%") == round(b.get_array("LD%", [0]) / 2), "окно манёвра не половинное"
     assert b.get_var("FL%") == 0
     drawn, erased = drawn_erased(b)
     assert len(drawn) == 4 and len(erased) == 4, (drawn, erased)
@@ -367,7 +368,7 @@ def t_lock_reset_limit():
     place(b, 3, 0, 4, 0)
     b.call(HARD)
     limit = b.get_var("ML%")
-    full = b.get_array("LD%", [0])
+    full = b.get_array("LD%", [0])   # продление после действия — уже полное
     grace = b.get_array("AG%", [0])
     for i in range(limit):
         b.set_var("LK%", 1)

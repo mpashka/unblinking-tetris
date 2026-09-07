@@ -1,4 +1,4 @@
-<title>Тетрис на кассетном Бейсике</title>
+<title>Немигающий тетрис</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Sans+Narrow:wght@400;700&display=swap">
 <style>
   :root {
@@ -282,8 +282,8 @@
 
 <div class="wrap">
   <header>
-    <div class="eyebrow">Электроника МС 0511 · Вильнюс-Бейсик 1988.09.28</div>
-    <h1>Тетрис на кассетном Бейсике</h1>
+    <div class="eyebrow">Электроника МС 0511 · кассетный Вильнюс-Бейсик 1988.09.28</div>
+    <h1>Немигающий тетрис</h1>
     <p class="lead">Это настоящий Бейсик, а не запись экрана: программа лежит в памяти машины,
       её можно править и запускать. Наберите <b>RUN</b> — и пойдёт тетрис, управление стрелками.
       Две версии отличаются одной подпрограммой: первая перепечатывает только изменившиеся
@@ -455,13 +455,14 @@ class Screen {
   }
 }
 
-/* КОИ-7: латиница и знаки идут как ASCII, кириллица — своим блоком. */
+/* КОИ-7: латиница и знаки идут как ASCII, кириллица — своим блоком.
+   Коды 128..255 пропускаются как есть: так CHR$(164) и прочая псевдографика
+   доезжает до экрана тем же знаком, каким её задала программа. */
 const CYR = "ЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧЪ";
 function koi7(ch) {
   const code = ch.codePointAt(0);
-  if (code < 128) return code;
-  const upper = ch.toUpperCase();
-  const idx = CYR.indexOf(upper);
+  if (code < 256) return code;
+  const idx = CYR.indexOf(ch.toUpperCase());
   if (idx >= 0) return 224 + idx;
   return 63;
 }
@@ -1078,7 +1079,12 @@ function draw() {
   const img = ctx.createImageData(cols * cw, ROWS * CHH);
   const px = img.data;
   const bg = [11, 12, 12];
-  const ink = [233, 236, 236];
+  // Фигурки ярче всего остального: пустота стакана остаётся чёрной, рамка и
+  // панель приглушены, а знак фигуры светится.
+  const inkDim = [176, 184, 186];
+  const inkBright = [255, 255, 255];
+  const blockChar = machine.getVar("CB$");
+  const blockCode = blockChar && blockChar.length ? koi7(blockChar[0]) : -1;
   for (let i = 0; i < px.length; i += 4) {
     px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; px[i + 3] = 255;
   }
@@ -1087,6 +1093,7 @@ function draw() {
     for (let col = 0; col < cols; col++) {
       const code = machine.screen.cells[row * COLS + col];
       if (code === 32) continue;
+      const ink = code === blockCode ? inkBright : inkDim;
       const g = (code - 32) * 8;
       if (g < 0 || g + 8 > FONT.length) continue;
       for (let dy = 0; dy < GH; dy++) {
