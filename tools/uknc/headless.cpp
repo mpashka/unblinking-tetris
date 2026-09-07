@@ -253,6 +253,17 @@ static bool LoadState(const char* path)
     return true;
 }
 
+// Слепок плана памяти: нужен, чтобы искать в нём таблицу знакогенератора.
+static bool DumpRam(int plan, const char* path)
+{
+    FILE* fp = fopen(path, "wb");
+    if (fp == NULL) return false;
+    for (int offset = 0; offset < 65536; offset++)
+        fputc(g_pBoard->GetRAMByte(plan, (uint16_t)offset), fp);
+    fclose(fp);
+    return true;
+}
+
 static bool SaveScreen(const char* path)
 {
     const int width = 640, height = 288;
@@ -412,6 +423,13 @@ int main(int argc, char** argv)
         {
             if (LoadState(rest.c_str())) fprintf(stderr, "состояние загружено: %s\n", rest.c_str());
             else fprintf(stderr, "не загрузилось состояние %s\n", rest.c_str());
+        }
+        else if (cmd == "dumpram")
+        {
+            int plan = 0; char file[256] = {0};
+            sscanf(rest.c_str(), "%d %255s", &plan, file);
+            if (DumpRam(plan, file)) fprintf(stderr, "слепок плана %d -> %s\n", plan, file);
+            else fprintf(stderr, "не записался слепок %s\n", file);
         }
         else if (cmd == "save")
         {

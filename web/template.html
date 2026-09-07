@@ -278,6 +278,18 @@
     min-height: 1.4em;
   }
   .msg[data-kind="bad"] { color: #c0503a; }
+
+  .charset-note { margin: 10px 0 12px; font-size: 14px; color: var(--muted); max-width: 66ch; }
+  #charset {
+    display: block;
+    max-width: 100%;
+    width: 416px;
+    height: auto;
+    image-rendering: pixelated;
+    background: var(--screen-bg);
+    border-radius: 4px;
+    cursor: pointer;
+  }
 </style>
 
 <div class="wrap">
@@ -361,6 +373,15 @@
       <p class="msg" id="msg"></p>
     </div>
   </div>
+
+  <details>
+    <summary>Таблица знаков УКНЦ — щёлкните, чтобы выбрать знак клетки</summary>
+    <p class="charset-note">Все 224 печатных знака из ПЗУ машины: 32-127 латиница и знаки,
+      128-159 стрелки и служебные, 160-191 псевдографика, 192-255 кириллица. Выбранный знак
+      сразу подставляется в программу — строка <code>CB$</code>.</p>
+    <canvas id="charset" width="416" height="364" aria-label="Таблица знаков УКНЦ"></canvas>
+    <p class="msg" id="charset-msg">Сейчас клетка стакана — знак 79 (полый квадрат).</p>
+  </details>
 
   <details open>
     <summary>Листинг — правьте и записывайте в память</summary>
@@ -1016,6 +1037,7 @@ const speedEl = document.getElementById("speed");
 let machine = null;
 let program = "diff";
 let wide = false;
+let cellCode = 79;      // знак клетки стакана; 79 — полый квадрат
 let inputLine = "";
 let lastCounters = [0, 0];
 let cursorOn = true;
@@ -1035,7 +1057,10 @@ function sourceFor(name) {
   // Ширина клетки — единственная строка, которой отличается широкий режим:
   // на машине формат экрана переключается меню УСТ, а программа только
   // узнаёт из CW%, сколько знаков занимает одна клетка стакана.
-  return SOURCES[name].replace(/^105 CW%=\d+$/m, "105 CW%=" + (wide ? 1 : 2));
+  return SOURCES[name]
+    .replace(/^105 CW%=\d+$/m, "105 CW%=" + (wide ? 1 : 2))
+    .replace(/^(\d+) CB\$=.*$/m, "$1 CB$=CHR$(" + cellCode + ")+\" \"")
+    .replace(/^(\d+) IF CW%=1 THEN CB\$=.*$/m, "$1 IF CW%=1 THEN CB$=CHR$(" + cellCode + ")");
 }
 
 function boot() {
@@ -1122,6 +1147,54 @@ function draw() {
   }
   ctx.putImageData(img, 0, 0);
 }
+
+/* --------------------------------------------------- таблица знаков машины */
+const charset = document.getElementById("charset");
+const charsetMsg = document.getElementById("charset-msg");
+const CHAR_SCALE = 3, CHAR_STEP = 8 * CHAR_SCALE + 2, CHAR_COLS = 16, CHAR_ROWS = 14;
+
+function drawCharset() {
+  const ctx2 = charset.getContext("2d");
+  const img = ctx2.createImageData(charset.width, charset.height);
+  const px = img.data;
+  for (let i = 0; i < px.length; i += 4) { px[i] = 11; px[i + 1] = 12; px[i + 2] = 12; px[i + 3] = 255; }
+  for (let n = 0; n < 224; n++) {
+    const code = n + 32;
+    const cx = (n % CHAR_COLS) * CHAR_STEP + 1, cy = ((n / CHAR_COLS) | 0) * CHAR_STEP + 1;
+    const chosen = code === cellCode;
+    const g = (code - 32) * 8;
+    for (let dy = 0; dy < 8; dy++) {
+      const row = FONT[g + dy];
+      for (let dx = 0; dx < 8; dx++) {
+        const on = (row & (0x80 >> dx)) !== 0;
+        if (!on && !chosen) continue;
+        for (let sy = 0; sy < CHAR_SCALE; sy++) {
+          for (let sx = 0; sx < CHAR_SCALE; sx++) {
+            const x = cx + dx * CHAR_SCALE + sx, y = cy + dy * CHAR_SCALE + sy;
+            const o = (y * charset.width + x) * 4;
+            if (on) { px[o] = 255; px[o + 1] = 255; px[o + 2] = 255; }
+            else { px[o] = 46; px[o + 1] = 62; px[o + 2] = 68; }
+          }
+        }
+      }
+    }
+  }
+  ctx2.putImageData(img, 0, 0);
+}
+
+charset.addEventListener("click", (e) => {
+  const rect = charset.getBoundingClientRect();
+  const scale = charset.width / rect.width;
+  const col = Math.floor((e.clientX - rect.left) * scale / CHAR_STEP);
+  const row = Math.floor((e.clientY - rect.top) * scale / CHAR_STEP);
+  if (col < 0 || col >= CHAR_COLS || row < 0 || row >= CHAR_ROWS) return;
+  const code = 32 + row * CHAR_COLS + col;
+  if (code > 255) return;
+  cellCode = code;
+  drawCharset();
+  charsetMsg.textContent = "Клетка стакана — знак " + code + ". Программа перезаписана, наберите RUN.";
+  boot();
+});
 
 /* ------------------------------------------------------------- главный цикл */
 let last = performance.now();
@@ -1316,5 +1389,6 @@ for (const radio of document.querySelectorAll('input[name="prog"]')) {
 }
 
 boot();
+drawCharset();
 requestAnimationFrame(frame);
 </script>
