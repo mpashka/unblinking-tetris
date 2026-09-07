@@ -87,18 +87,18 @@ def counters(b):
 
 def touched(b):
     """Журнал вывода, переведённый в клетки стакана: (x, y, занята ли)."""
-    bx, by = b.get_var("BX%"), b.get_var("BY%")
-    block = b.get_var("CB$")
+    bx, by, cw = b.get_var("BX%"), b.get_var("BY%"), b.get_var("CW%")
+    block, blank = b.get_var("CB$"), b.get_var("CE$")
     out = []
     for op in b.screen.ops:
         if op[0] != "print":
             continue
         _, col, row, text, _color = op
-        if text not in (block, "  "):
+        if text not in (block, blank):
             continue
-        if (col - bx) % 2:
+        if (col - bx) % cw:
             continue
-        cx, cy = (col - bx) // 2, row - by
+        cx, cy = (col - bx) // cw, row - by
         if 0 <= cx < b.get_var("BW%") and 0 <= cy < b.get_var("BH%"):
             out.append((cx, cy, text == block))
     return out
@@ -194,7 +194,7 @@ def t_gravity_diff():
         assert erased == old - new and drawn == new - old, TYPES[t]
 
 
-@test("все переходы ориентаций: фигура остаётся целой, разница минимальна")
+@test("все переходы ориентаций против часовой: фигура цела, разница минимальна")
 def t_all_rotations():
     for t in range(1, 8):
         n = rots(boot(), t)
@@ -204,7 +204,7 @@ def t_all_rotations():
             old = piece_cells(b)
             b.call(ROTATE)
             new = piece_cells(b)
-            expected_rot = (r + 1) % n
+            expected_rot = (r - 1) % n
             assert b.get_var("CR%") == expected_rot, f"{TYPES[t]} r{r} -> r{b.get_var('CR%')}"
             assert len(new) == 4
             drawn, erased = drawn_erased(b)
@@ -575,8 +575,9 @@ def t_keys():
         assert table.get(code) == action, f"код {code}"
     for code, action in ((55, 1), (57, 2), (53, 3), (56, 4)):
         assert table.get(code) == action, f"раскладка БК: код {code}"
-    # стрелки приходят двумя байтами: 27 и буква. Проверяем оба шага.
-    for letter, action in (("A", 4), ("B", 3), ("C", 2), ("D", 1)):
+    # стрелки приходят двумя байтами: 27 и буква. Влево-вправо двигают,
+    # вверх поворачивает, вниз сбрасывает фигуру целиком.
+    for letter, action in (("A", 4), ("B", 5), ("C", 2), ("D", 1)):
         b.set_var("ES%", 0)
         b.keys.extend([chr(27), letter])
         b.call(1000)
@@ -605,8 +606,8 @@ def t_classic():
     place(b, 3, 0, 4, 8)
     b.call(ROTATE)
     assert counters(b) == (4, 4), counters(b)
-    # но игровая логика та же
-    assert b.get_var("CR%") == 1
+    # но игровая логика та же: поворот против часовой стрелки
+    assert b.get_var("CR%") == 3
     place(b, 2, 0, 4, 8)
     b.call(ROTATE)
     assert counters(b) == (0, 0), "O не вращается, значит и печатать нечего"

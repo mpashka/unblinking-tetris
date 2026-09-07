@@ -2,41 +2,41 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Sans+Narrow:wght@400;700&display=swap">
 <style>
   :root {
-    --ground: #f2ece5;
-    --panel: #fffaf4;
-    --line: #ddd0c3;
-    --text: #241a12;
-    --muted: #6d5a4b;
-    --accent: #a85c00;
-    --accent-soft: #f6e2c4;
-    --screen-bg: #d81c00;
-    --screen-ink: #ffffff;
-    --bezel: #2a211b;
-    --shadow: 0 1px 2px rgba(36, 26, 18, .10), 0 8px 24px rgba(36, 26, 18, .08);
+    --ground: #eceded;
+    --panel: #fbfcfc;
+    --line: #cdd2d4;
+    --text: #16191b;
+    --muted: #5d666b;
+    --accent: #35606f;
+    --accent-soft: #dde6e9;
+    --screen-bg: #0b0c0c;
+    --screen-ink: #e9ecec;
+    --bezel: #2b2f31;
+    --shadow: 0 1px 2px rgba(22, 25, 27, .10), 0 8px 24px rgba(22, 25, 27, .08);
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --ground: #17130f;
-      --panel: #211a15;
-      --line: #3a2c23;
-      --text: #ece2d8;
-      --muted: #a3877a;
-      --accent: #ffb020;
-      --accent-soft: #3a2a15;
-      --bezel: #0d0a08;
+      --ground: #131617;
+      --panel: #1c2022;
+      --line: #333a3d;
+      --text: #e4e8e9;
+      --muted: #98a3a8;
+      --accent: #9fc3d1;
+      --accent-soft: #243136;
+      --bezel: #0a0c0d;
       --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .35);
     }
   }
   :root[data-theme="dark"] {
-    --ground: #17130f;
-    --panel: #211a15;
-    --line: #3a2c23;
-    --text: #ece2d8;
-    --muted: #a3877a;
-    --accent: #ffb020;
-    --accent-soft: #3a2a15;
-    --bezel: #0d0a08;
+    --ground: #131617;
+    --panel: #1c2022;
+    --line: #333a3d;
+    --text: #e4e8e9;
+    --muted: #98a3a8;
+    --accent: #9fc3d1;
+    --accent-soft: #243136;
+    --bezel: #0a0c0d;
     --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .35);
   }
 
@@ -118,10 +118,10 @@
     text-transform: uppercase;
     letter-spacing: .12em;
     font-size: 12px;
-    color: #b7a79c;
+    color: #9aa3a6;
   }
-  .lamp { color: #ffb020; }
-  .lamp[data-state="idle"] { color: #6f635b; }
+  .lamp { color: #e9ecec; }
+  .lamp[data-state="idle"] { color: #7d8588; }
 
   .panel {
     background: var(--panel);
@@ -277,7 +277,7 @@
     color: var(--muted);
     min-height: 1.4em;
   }
-  .msg[data-kind="bad"] { color: #d34a2a; }
+  .msg[data-kind="bad"] { color: #c0503a; }
 </style>
 
 <div class="wrap">
@@ -285,9 +285,9 @@
     <div class="eyebrow">Электроника МС 0511 · Вильнюс-Бейсик 1988.09.28</div>
     <h1>Тетрис на кассетном Бейсике</h1>
     <p class="lead">Это настоящий Бейсик, а не запись экрана: программа лежит в памяти машины,
-      её можно править и запускать. Наберите <b>RUN</b> — и пойдёт тетрис. Две версии отличаются
-      одной подпрограммой: первая перепечатывает только изменившиеся клетки, вторая стирает фигуру
-      целиком и печатает заново. Счётчик справа показывает разницу.</p>
+      её можно править и запускать. Наберите <b>RUN</b> — и пойдёт тетрис, управление стрелками.
+      Две версии отличаются одной подпрограммой: первая перепечатывает только изменившиеся
+      клетки, вторая стирает фигуру целиком и печатает заново. Счётчик справа показывает разницу.</p>
   </header>
 
   <div class="stage">
@@ -295,7 +295,7 @@
       <canvas id="screen" width="512" height="264" tabindex="0"
               aria-label="Экран УКНЦ, 64 на 24 знакоместа"></canvas>
       <div class="monitor-foot">
-        <span>УК-НЦ · 64×24 · КОИ-7</span>
+        <span id="fmt-label">УК-НЦ · 80×24 · КОИ-7</span>
         <span class="lamp" id="lamp" data-state="idle">готов</span>
       </div>
     </div>
@@ -311,6 +311,20 @@
           <label>
             <input type="radio" name="prog" value="classic">
             <span>Мигающая<small>стирает все четыре клетки и печатает заново</small></span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <h2>Формат экрана</h2>
+        <div class="choice">
+          <label>
+            <input type="radio" name="fmt" value="80" checked>
+            <span>80×24<small>как машина включается: клетка — два знака</small></span>
+          </label>
+          <label>
+            <input type="radio" name="fmt" value="40">
+            <span>40×24, широкие буквы<small>клетка — один знак; на машине это меню УСТ</small></span>
           </label>
         </div>
       </div>
@@ -339,9 +353,11 @@
         <button id="reset">Сброс</button>
       </div>
 
-      <p class="keys"><kbd>A</kbd> <kbd>D</kbd> — вбок, <kbd>W</kbd> — поворот,
-        <kbd>S</kbd> — вниз, <kbd>пробел</kbd> — сброс, <kbd>P</kbd> — пауза,
-        <kbd>Q</kbd> — выход. Стрелки тоже работают. Щёлкните по экрану, чтобы он слышал клавиши.</p>
+      <p class="keys"><kbd>←</kbd> <kbd>→</kbd> — вбок, <kbd>↑</kbd> — поворот против часовой,
+        <kbd>↓</kbd> или <kbd>пробел</kbd> — сброс, <kbd>P</kbd> — пауза, <kbd>Q</kbd> — выход.
+        Работают и <kbd>A</kbd> <kbd>D</kbd> <kbd>W</kbd> <kbd>S</kbd>, и раскладка БК
+        <kbd>7</kbd> <kbd>9</kbd> <kbd>8</kbd> <kbd>5</kbd>.
+        Щёлкните по экрану, чтобы он слышал клавиши.</p>
       <p class="msg" id="msg"></p>
     </div>
   </div>
@@ -424,7 +440,7 @@
 102 BH%=20
 103 BX%=3
 104 BY%=1
-105 HX%=30
+105 CW%=2
 106 AC%=0
 107 ML%=12
 108 SL%=0
@@ -432,17 +448,24 @@
 110 DB%=0
 111 CB$="[]"
 112 CE$="  "
-113 REM THE BLOCK IS ONE VARIABLE, SO THE LOOK OF A CELL IS ONE EDIT.
-114 REM THIS BASIC CANNOT REDEFINE THE CHARACTER GENERATOR - SYMBOL,
-115 REM CHAR, FONT AND DEFCHR ALL ANSWER WITH ERROR 2 - SO A BLOCK IS
-116 REM MADE OF CHARACTERS THAT ALREADY EXIST. THE KOI-7 BOX DRAWING
-117 REM SET LIVES AT 160..191, FOR EXAMPLE CB$=CHR$(179)+CHR$(179).
-120 DIM BD%(9,19),SX%(27,3),TY%(27,3)
-121 DIM NR%(7),SP%(7)
-122 DIM KX%(9),KY%(9)
-123 DIM GD%(9),LD%(9),AG%(9)
-124 DIM AX%(3),AY%(3),NX%(3),NY%(3)
-125 DIM KA%(23),KV%(23)
+113 REM CW% IS HOW MANY CHARACTERS ONE CELL TAKES. THE MACHINE BOOTS IN
+114 REM 80 COLUMNS, WHERE ONE CELL NEEDS TWO. SWITCH THE TERMINAL TO
+115 REM 40X24 WITH THE UST KEY (SYSTEM MENU, "FORMAT EKRANA") AND SET
+116 REM CW%=1 - THEN ONE WIDE CHARACTER IS ONE CELL, THE WAY THE OLD
+117 REM GAMES DID IT. THE BLOCK IS A VARIABLE, SO ITS LOOK IS ONE EDIT.
+118 REM THIS BASIC CANNOT REDEFINE THE CHARACTER GENERATOR - SYMBOL,
+119 REM CHAR, FONT AND DEFCHR ALL ANSWER WITH ERROR 2 - SO A BLOCK IS
+120 REM MADE OF CHARACTERS THAT ALREADY EXIST. THE KOI-7 BOX DRAWING
+121 REM SET LIVES AT 160..191, FOR EXAMPLE CB$=CHR$(179)+CHR$(179).
+122 IF CW%=1 THEN CB$="#"
+123 IF CW%=1 THEN CE$=" "
+124 HX%=BX%+BW%*CW%+4
+130 DIM BD%(9,19),SX%(27,3),TY%(27,3)
+131 DIM NR%(7),SP%(7)
+132 DIM KX%(9),KY%(9)
+133 DIM GD%(9),LD%(9),AG%(9)
+134 DIM AX%(3),AY%(3),NX%(3),NY%(3)
+135 DIM KA%(23),KV%(23)
 200 REM ---------------- TABLES FROM DATA ----------------
 201 FOR Z%=1 TO 7
 202 READ NR%(Z%),SP%(Z%)
@@ -475,11 +498,11 @@
 253 LOCATE 24,8
 254 PRINT "T E T R I S"
 255 LOCATE 18,11
-256 PRINT "A D - LEFT AND RIGHT, W - ROTATE"
+256 PRINT "ARROWS - MOVE, UP TURNS, DOWN DROPS"
 257 LOCATE 18,12
-258 PRINT "S - DOWN, SPACE - DROP, P - PAUSE"
+258 PRINT "SPACE - DROP, P - PAUSE, Q - QUIT"
 259 LOCATE 18,13
-260 PRINT "ARROWS WORK TOO, Q - QUIT"
+260 PRINT "A D W S AND 7 9 8 5 WORK TOO"
 261 LOCATE 18,16
 262 PRINT "PRESS ANY KEY"
 263 RC%=0
@@ -557,9 +580,10 @@
 1050 ES%=1
 1051 RETURN
 1060 REM ---- SECOND BYTE OF AN ARROW: ESC A B C D ----
+1059 REM LEFT AND RIGHT MOVE, UP TURNS, DOWN DROPS THE PIECE AT ONCE.
 1061 ES%=0
 1062 IF KC%=65 THEN AK%=4
-1063 IF KC%=66 THEN AK%=3
+1063 IF KC%=66 THEN AK%=5
 1064 IF KC%=67 THEN AK%=2
 1065 IF KC%=68 THEN AK%=1
 1066 RETURN
@@ -719,11 +743,11 @@
 3453 LK%=LD%(LV%)
 3454 LR%=0
 3455 RETURN
-4000 REM ---- TRY ROTATE CLOCKWISE WITH KICKS ----
+4000 REM ---- TRY ROTATE ANTICLOCKWISE WITH KICKS ----
 4001 IF NR%(CT%)=1 THEN RETURN
 4002 GOSUB 5000
-4003 W%=CR%+1
-4004 IF W%>=NR%(CT%) THEN W%=0
+4003 W%=CR%-1
+4004 IF W%<0 THEN W%=NR%(CT%)-1
 4005 RX%=CX%
 4006 RY%=CY%
 4007 I%=0
@@ -870,17 +894,17 @@
 7002 CLS
 7005 LOCATE BX%-1,BY%-1
 7006 PRINT "+";
-7007 PRINT STRING$(BW%*2,"-");
+7007 PRINT STRING$(BW%*CW%,"-");
 7008 PRINT "+";
 7009 FOR Y%=0 TO BH%-1
 7010 LOCATE BX%-1,BY%+Y%
 7011 PRINT "!";
-7012 LOCATE BX%+BW%*2,BY%+Y%
+7012 LOCATE BX%+BW%*CW%,BY%+Y%
 7013 PRINT "!";
 7014 NEXT Y%
 7015 LOCATE BX%-1,BY%+BH%
 7016 PRINT "+";
-7017 PRINT STRING$(BW%*2,"-");
+7017 PRINT STRING$(BW%*CW%,"-");
 7018 PRINT "+";
 7019 LOCATE HX%,BY%
 7020 PRINT "NEXT"
@@ -905,19 +929,19 @@
 7301 IF PV%=0 THEN GOTO 7310
 7302 SI%=(PV%-1)*4
 7305 FOR I%=0 TO 3
-7306 LOCATE HX%+SX%(SI%,I%)*2,BY%+2+TY%(SI%,I%)
+7306 LOCATE HX%+SX%(SI%,I%)*CW%,BY%+2+TY%(SI%,I%)
 7307 PRINT CE$;
 7308 NEXT I%
 7310 SI%=(NT%-1)*4
 7313 FOR I%=0 TO 3
-7314 LOCATE HX%+SX%(SI%,I%)*2,BY%+2+TY%(SI%,I%)
+7314 LOCATE HX%+SX%(SI%,I%)*CW%,BY%+2+TY%(SI%,I%)
 7315 PRINT CB$;
 7316 NEXT I%
 7317 PV%=NT%
 7318 RETURN
 8000 REM ---- PRINT A BLOCK AT WELL CELL GX% GY% ----
 8001 IF GY%<0 THEN RETURN
-8003 LOCATE BX%+GX%*2,BY%+GY%
+8003 LOCATE BX%+GX%*CW%,BY%+GY%
 8004 PRINT CB$;
 8005 DC%=DC%+1
 8006 RETURN
@@ -925,7 +949,7 @@
 8011 REM REDRAW IT IS PARKED IN THE EMPTY PART OF THE PANEL BY 5131.
 8100 REM ---- ERASE WELL CELL GX% GY% ----
 8101 IF GY%<0 THEN RETURN
-8102 LOCATE BX%+GX%*2,BY%+GY%
+8102 LOCATE BX%+GX%*CW%,BY%+GY%
 8103 PRINT CE$;
 8104 EC%=EC%+1
 8105 RETURN
@@ -1047,7 +1071,7 @@
 102 BH%=20
 103 BX%=3
 104 BY%=1
-105 HX%=30
+105 CW%=2
 106 AC%=0
 107 ML%=12
 108 SL%=0
@@ -1055,17 +1079,24 @@
 110 DB%=0
 111 CB$="[]"
 112 CE$="  "
-113 REM THE BLOCK IS ONE VARIABLE, SO THE LOOK OF A CELL IS ONE EDIT.
-114 REM THIS BASIC CANNOT REDEFINE THE CHARACTER GENERATOR - SYMBOL,
-115 REM CHAR, FONT AND DEFCHR ALL ANSWER WITH ERROR 2 - SO A BLOCK IS
-116 REM MADE OF CHARACTERS THAT ALREADY EXIST. THE KOI-7 BOX DRAWING
-117 REM SET LIVES AT 160..191, FOR EXAMPLE CB$=CHR$(179)+CHR$(179).
-120 DIM BD%(9,19),SX%(27,3),TY%(27,3)
-121 DIM NR%(7),SP%(7)
-122 DIM KX%(9),KY%(9)
-123 DIM GD%(9),LD%(9),AG%(9)
-124 DIM AX%(3),AY%(3),NX%(3),NY%(3)
-125 DIM KA%(23),KV%(23)
+113 REM CW% IS HOW MANY CHARACTERS ONE CELL TAKES. THE MACHINE BOOTS IN
+114 REM 80 COLUMNS, WHERE ONE CELL NEEDS TWO. SWITCH THE TERMINAL TO
+115 REM 40X24 WITH THE UST KEY (SYSTEM MENU, "FORMAT EKRANA") AND SET
+116 REM CW%=1 - THEN ONE WIDE CHARACTER IS ONE CELL, THE WAY THE OLD
+117 REM GAMES DID IT. THE BLOCK IS A VARIABLE, SO ITS LOOK IS ONE EDIT.
+118 REM THIS BASIC CANNOT REDEFINE THE CHARACTER GENERATOR - SYMBOL,
+119 REM CHAR, FONT AND DEFCHR ALL ANSWER WITH ERROR 2 - SO A BLOCK IS
+120 REM MADE OF CHARACTERS THAT ALREADY EXIST. THE KOI-7 BOX DRAWING
+121 REM SET LIVES AT 160..191, FOR EXAMPLE CB$=CHR$(179)+CHR$(179).
+122 IF CW%=1 THEN CB$="#"
+123 IF CW%=1 THEN CE$=" "
+124 HX%=BX%+BW%*CW%+4
+130 DIM BD%(9,19),SX%(27,3),TY%(27,3)
+131 DIM NR%(7),SP%(7)
+132 DIM KX%(9),KY%(9)
+133 DIM GD%(9),LD%(9),AG%(9)
+134 DIM AX%(3),AY%(3),NX%(3),NY%(3)
+135 DIM KA%(23),KV%(23)
 200 REM ---------------- TABLES FROM DATA ----------------
 201 FOR Z%=1 TO 7
 202 READ NR%(Z%),SP%(Z%)
@@ -1098,11 +1129,11 @@
 253 LOCATE 24,8
 254 PRINT "T E T R I S"
 255 LOCATE 18,11
-256 PRINT "A D - LEFT AND RIGHT, W - ROTATE"
+256 PRINT "ARROWS - MOVE, UP TURNS, DOWN DROPS"
 257 LOCATE 18,12
-258 PRINT "S - DOWN, SPACE - DROP, P - PAUSE"
+258 PRINT "SPACE - DROP, P - PAUSE, Q - QUIT"
 259 LOCATE 18,13
-260 PRINT "ARROWS WORK TOO, Q - QUIT"
+260 PRINT "A D W S AND 7 9 8 5 WORK TOO"
 261 LOCATE 18,16
 262 PRINT "PRESS ANY KEY"
 263 RC%=0
@@ -1180,9 +1211,10 @@
 1050 ES%=1
 1051 RETURN
 1060 REM ---- SECOND BYTE OF AN ARROW: ESC A B C D ----
+1059 REM LEFT AND RIGHT MOVE, UP TURNS, DOWN DROPS THE PIECE AT ONCE.
 1061 ES%=0
 1062 IF KC%=65 THEN AK%=4
-1063 IF KC%=66 THEN AK%=3
+1063 IF KC%=66 THEN AK%=5
 1064 IF KC%=67 THEN AK%=2
 1065 IF KC%=68 THEN AK%=1
 1066 RETURN
@@ -1342,11 +1374,11 @@
 3453 LK%=LD%(LV%)
 3454 LR%=0
 3455 RETURN
-4000 REM ---- TRY ROTATE CLOCKWISE WITH KICKS ----
+4000 REM ---- TRY ROTATE ANTICLOCKWISE WITH KICKS ----
 4001 IF NR%(CT%)=1 THEN RETURN
 4002 GOSUB 5000
-4003 W%=CR%+1
-4004 IF W%>=NR%(CT%) THEN W%=0
+4003 W%=CR%-1
+4004 IF W%<0 THEN W%=NR%(CT%)-1
 4005 RX%=CX%
 4006 RY%=CY%
 4007 I%=0
@@ -1478,17 +1510,17 @@
 7002 CLS
 7005 LOCATE BX%-1,BY%-1
 7006 PRINT "+";
-7007 PRINT STRING$(BW%*2,"-");
+7007 PRINT STRING$(BW%*CW%,"-");
 7008 PRINT "+";
 7009 FOR Y%=0 TO BH%-1
 7010 LOCATE BX%-1,BY%+Y%
 7011 PRINT "!";
-7012 LOCATE BX%+BW%*2,BY%+Y%
+7012 LOCATE BX%+BW%*CW%,BY%+Y%
 7013 PRINT "!";
 7014 NEXT Y%
 7015 LOCATE BX%-1,BY%+BH%
 7016 PRINT "+";
-7017 PRINT STRING$(BW%*2,"-");
+7017 PRINT STRING$(BW%*CW%,"-");
 7018 PRINT "+";
 7019 LOCATE HX%,BY%
 7020 PRINT "NEXT"
@@ -1513,19 +1545,19 @@
 7301 IF PV%=0 THEN GOTO 7310
 7302 SI%=(PV%-1)*4
 7305 FOR I%=0 TO 3
-7306 LOCATE HX%+SX%(SI%,I%)*2,BY%+2+TY%(SI%,I%)
+7306 LOCATE HX%+SX%(SI%,I%)*CW%,BY%+2+TY%(SI%,I%)
 7307 PRINT CE$;
 7308 NEXT I%
 7310 SI%=(NT%-1)*4
 7313 FOR I%=0 TO 3
-7314 LOCATE HX%+SX%(SI%,I%)*2,BY%+2+TY%(SI%,I%)
+7314 LOCATE HX%+SX%(SI%,I%)*CW%,BY%+2+TY%(SI%,I%)
 7315 PRINT CB$;
 7316 NEXT I%
 7317 PV%=NT%
 7318 RETURN
 8000 REM ---- PRINT A BLOCK AT WELL CELL GX% GY% ----
 8001 IF GY%<0 THEN RETURN
-8003 LOCATE BX%+GX%*2,BY%+GY%
+8003 LOCATE BX%+GX%*CW%,BY%+GY%
 8004 PRINT CB$;
 8005 DC%=DC%+1
 8006 RETURN
@@ -1533,7 +1565,7 @@
 8011 REM REDRAW IT IS PARKED IN THE EMPTY PART OF THE PANEL BY 5131.
 8100 REM ---- ERASE WELL CELL GX% GY% ----
 8101 IF GY%<0 THEN RETURN
-8102 LOCATE BX%+GX%*2,BY%+GY%
+8102 LOCATE BX%+GX%*CW%,BY%+GY%
 8103 PRINT CE$;
 8104 EC%=EC%+1
 8105 RETURN
@@ -2227,6 +2259,7 @@ const speedEl = document.getElementById("speed");
 
 let machine = null;
 let program = "diff";
+let wide = false;
 let inputLine = "";
 let lastCounters = [0, 0];
 let cursorOn = true;
@@ -2242,9 +2275,16 @@ function say(text, kind) {
   msg.dataset.kind = kind || "";
 }
 
+function sourceFor(name) {
+  // Ширина клетки — единственная строка, которой отличается широкий режим:
+  // на машине формат экрана переключается меню УСТ, а программа только
+  // узнаёт из CW%, сколько знаков занимает одна клетка стакана.
+  return SOURCES[name].replace(/^105 CW%=\d+$/m, "105 CW%=" + (wide ? 1 : 2));
+}
+
 function boot() {
-  machine = new Basic(SOURCES[program]);
-  listing.value = SOURCES[program];
+  machine = new Basic(sourceFor(program));
+  listing.value = sourceFor(program);
   for (const line of BANNER) { machine.screen.write(line); machine.screen.newline(); }
   prompt();
   lastCounters = [0, 0];
@@ -2277,16 +2317,19 @@ function updateCounters(force) {
 
 /* ------------------------------------------------------------- отрисовка */
 function draw() {
-  const img = ctx.createImageData(COLS * CW, ROWS * CHH);
+  const cw = wide ? CW * 2 : CW;
+  const cols = wide ? 40 : COLS;
+  if (canvas.width !== cols * cw) canvas.width = cols * cw;
+  const img = ctx.createImageData(cols * cw, ROWS * CHH);
   const px = img.data;
-  const bg = [216, 28, 0];
-  const ink = [255, 255, 255];
+  const bg = [11, 12, 12];
+  const ink = [233, 236, 236];
   for (let i = 0; i < px.length; i += 4) {
     px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; px[i + 3] = 255;
   }
-  const width = COLS * CW;
+  const width = cols * cw;
   for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLS; col++) {
+    for (let col = 0; col < cols; col++) {
       const code = machine.screen.cells[row * COLS + col];
       if (code === 32) continue;
       const g = (code - 32) * 8;
@@ -2297,16 +2340,19 @@ function draw() {
         const y = row * CHH + dy;
         for (let dx = 0; dx < 8; dx++) {
           if (!(bits & (0x80 >> dx))) continue;
-          const o = ((y * width) + col * CW + dx) * 4;
-          px[o] = ink[0]; px[o + 1] = ink[1]; px[o + 2] = ink[2];
+          const step = wide ? 2 : 1;
+          for (let k = 0; k < step; k++) {
+            const o = ((y * width) + col * cw + dx * step + k) * 4;
+            px[o] = ink[0]; px[o + 1] = ink[1]; px[o + 2] = ink[2];
+          }
         }
       }
     }
   }
-  if (!machine.running && cursorOn) {
-    const y0 = machine.screen.row * CHH, x0 = machine.screen.col * CW;
+  if (!machine.running && cursorOn && machine.screen.col < cols) {
+    const y0 = machine.screen.row * CHH, x0 = machine.screen.col * cw;
     for (let dy = 0; dy < GH; dy++) {
-      for (let dx = 0; dx < CW; dx++) {
+      for (let dx = 0; dx < cw; dx++) {
         const o = (((y0 + dy) * width) + x0 + dx) * 4;
         px[o] = 255; px[o + 1] = 255; px[o + 2] = 255;
       }
@@ -2481,9 +2527,21 @@ document.getElementById("load").addEventListener("click", () => {
 });
 
 document.getElementById("restore").addEventListener("click", () => {
-  listing.value = SOURCES[program];
+  listing.value = sourceFor(program);
   say("Листинг вернулся к исходному. Нажмите «Записать в память».");
 });
+
+for (const radio of document.querySelectorAll('input[name="fmt"]')) {
+  radio.addEventListener("change", () => {
+    wide = radio.value === "40";
+    document.getElementById("fmt-label").textContent =
+      wide ? "УК-НЦ · 40×24 · КОИ-7" : "УК-НЦ · 80×24 · КОИ-7";
+    boot();
+    say(wide
+      ? "Экран 40×24, широкие буквы: клетка стакана — один знак."
+      : "Экран 80×24: клетка стакана — два знака.");
+  });
+}
 
 for (const radio of document.querySelectorAll('input[name="prog"]')) {
   radio.addEventListener("change", () => {

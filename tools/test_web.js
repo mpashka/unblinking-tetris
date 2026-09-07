@@ -151,6 +151,24 @@ test("партия идёт: стакан нарисован, фигура па�
   assert(b.running, "игра остановилась сама, хотя должна крутиться");
 });
 
+test("широкий режим: клетка в один знак, стакан вдвое уже", () => {
+  const src = progDiff.replace(/^105 CW%=\d+$/m, "105 CW%=1");
+  const b = new Basic(src);
+  b.keys.push(" ");
+  b.start();
+  let guard = 400000;
+  while (b.running && guard-- > 0) b.step();
+  const rows = [];
+  for (let r = 0; r < 24; r++) {
+    let line = "";
+    for (let c = 0; c < 64; c++) line += String.fromCharCode(b.screen.cells[r * 64 + c]);
+    rows.push(line.replace(/\s+$/, ""));
+  }
+  const text = rows.join("\n");
+  assert(text.includes("+----------+"), "рамка стакана не сузилась до десяти знаков:\n" + text);
+  assert(text.includes("#"), "нет клетки в один знак");
+});
+
 test("двоеточие как разделитель операторов отвергается", () => {
   let threw = false;
   try { new Basic("10 A=1 : B=2"); } catch (e) { threw = true; }
