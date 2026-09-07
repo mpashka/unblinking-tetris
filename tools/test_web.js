@@ -141,7 +141,9 @@ test("партия идёт: стакан нарисован, фигура па�
   const cells = b.screen.cells;
   const walls = [...cells].filter(c => c === 164).length;   // двойная вертикаль
   const floor = [...cells].filter(c => c === 186).length;   // двойная горизонталь
-  const blocks = [...cells].filter(c => c === 79).length;   // пустой квадрат
+  // клетка фигуры — две половинки дорисованного квадрата, 128 и 129
+  const left = [...cells].filter(c => c === 128).length;
+  const right = [...cells].filter(c => c === 129).length;
   let text = "";
   for (let r = 0; r < 24; r++) {
     for (let c = 0; c < 64; c++) text += String.fromCharCode(cells[r * 64 + c]);
@@ -150,7 +152,7 @@ test("партия идёт: стакан нарисован, фигура па�
   assert(walls >= 40, "стены стакана не нарисованы: " + walls);
   assert(floor === 20, "пол стакана не из двадцати знаков: " + floor);
   assert(text.includes("SCORE"), "нет панели");
-  assert(blocks >= 4, "нет ни одной фигуры");
+  assert(left >= 4 && left === right, "клетки фигур не из половинок квадрата: " + left + "/" + right);
   assert(!text.includes("+---"), "верхняя планка всё ещё рисуется");
   assert(b.running, "игра остановилась сама, хотя должна крутиться");
 });
@@ -164,7 +166,41 @@ test("широкий режим: клетка в один знак, стакан
   while (b.running && guard-- > 0) b.step();
   const floor = [...b.screen.cells].filter(c => c === 186).length;
   assert(floor === 10, "пол стакана не сузился до десяти знаков: " + floor);
-  assert([...b.screen.cells].filter(c => c === 79).length >= 4, "нет клетки в один знак");
+  assert([...b.screen.cells].filter(c => c === 130).length >= 4, "нет клетки в один знак");
+  assert([...b.screen.cells].filter(c => c === 128).length === 0, "в широком формате половинок быть не должно");
+});
+
+test("уровень выбирается той же клавишей, что запускает игру", () => {
+  for (const [key, level] of [[" ", 0], ["7", 7], ["Z", 0]]) {
+    const b = new Basic(progDiff);
+    b.keys.push(key);
+    b.start();
+    const stopAt = b.resolve(400);
+    let guard = 400000;
+    while (b.running && guard-- > 0) {
+      if (b.pc[0] === stopAt && b.pc[1] === 0) break;
+      b.step();
+    }
+    assert(b.getVar("LV%") === level, "клавиша " + key + ": уровень " + b.getVar("LV%"));
+  }
+});
+
+test("рекорды: строковый массив, MID$ и вставка строки в таблицу", () => {
+  const b = boot(progDiff);
+  const names = [], points = [];
+  for (let i = 0; i < 5; i++) { names.push(b.getArray("HS$", [i])); points.push(b.getArray("HP", [i])); }
+  assert(names.every(n => typeof n === "string" && n.length), "таблица не прочиталась: " + names);
+
+  b.setVar("SR", points[4] - 1);
+  call(b, 7400);
+  assert(b.getVar("HI%") === -1, "проигравший попал в таблицу");
+
+  b.setVar("SR", points[0] + 1);
+  b.keys.push("A", "B", String.fromCharCode(8), "C", String.fromCharCode(13));
+  call(b, 7400);
+  assert(b.getVar("HI%") === 0, "строка " + b.getVar("HI%"));
+  assert(b.getArray("HS$", [0]) === "AC", "имя с забоем: " + b.getArray("HS$", [0]));
+  assert(b.getArray("HS$", [1]) === names[0], "старая первая строка не сдвинулась");
 });
 
 test("двоеточие как разделитель операторов отвергается", () => {

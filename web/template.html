@@ -379,11 +379,13 @@
     <p class="charset-note">Все 224 печатных знака из ПЗУ машины: 32-127 латиница и знаки,
       128-159 стрелки и служебные, 160-191 псевдографика, 192-255 кириллица. Выбранный знак
       сразу подставляется в программу — строка <code>CB$</code>.
-      Квадрата в наборе нет: знаки <b>127</b> (полый квадрат) и <b>143</b> (сплошной блок,
-      им выложен стакан) здесь дорисованы. На машине это делалось редактором шрифта с
-      системной дискеты — знакогенератор готовился до запуска программы.</p>
+      Квадрата в наборе нет вовсе, поэтому четыре знака дорисованы: <b>128</b> и <b>129</b> —
+      половинки квадрата (клетка формата 80×24 — это два знака), <b>130</b> — квадрат целиком
+      для широкого формата, <b>143</b> — сплошной блок, им выложен стакан. На машине это делал
+      редактор шрифта с системной дискеты: знакогенератор готовился до запуска программы.</p>
     <canvas id="charset" width="416" height="364" aria-label="Таблица знаков УКНЦ"></canvas>
-    <p class="msg" id="charset-msg">Сейчас клетка стакана — знак 79 (полый квадрат).</p>
+    <p class="msg" id="charset-msg">Сейчас клетка стакана — дорисованный квадрат: знаки 128 и 129.</p>
+    <p><button id="charset-reset" hidden>Вернуть квадрат</button></p>
   </details>
 
   <details open>
@@ -416,6 +418,12 @@
         системой. Графики нет вовсе, поэтому тетрис текстовый.</p>
     </section>
     <section>
+      <h3>Таблица рекордов</h3>
+      <p>Пять строк, попал — вводишь имя. Страница играет роль головного ПК: таблицу она
+        держит у себя и вписывает обратно в те же строки <code>DATA</code>, так что рекорды
+        переживают перезагрузку. <button id="records-clear">Стереть таблицу</button></p>
+    </section>
+    <section>
       <h3>Откуда числа задержек</h3>
       <p>Скорость измерена на живой машине: холостой виток главного цикла — <b>примерно 350 раз
         в секунду</b>. Отсюда таблица гравитации: на нулевом уровне фигура падает на клетку за
@@ -436,20 +444,37 @@ const FONT_HEX = "@@FONT@@";
 const FONT = new Uint8Array(FONT_HEX.length / 2);
 for (let i = 0; i < FONT.length; i++) FONT[i] = parseInt(FONT_HEX.substr(i * 2, 2), 16);
 
-/* Знак 127 в ПЗУ пуст, и здесь он занят полым квадратом — тем самым, которого
-   в наборе машины нет. На настоящем УКНЦ так и делали: начертания лежат в ПЗУ
-   периферийного процессора, а таблица указателей на них — в его ОЗУ, и своя
-   картинка подставлялась подменой указателя. Из Бейсика туда не дотянуться:
-   POKE центрального процессора этой памяти не видит (проверено). */
-const SQUARE = [0x00, 0x7e, 0x42, 0x42, 0x42, 0x42, 0x42, 0x7e];
-for (let i = 0; i < 8; i++) FONT[(127 - 32) * 8 + i] = SQUARE[i];
-/* Знак 143 — сплошной блок: им выложен стакан. Рисуется во всю клетку, а не в
-   восемь строк начертания: настоящий знак и есть 11 строк, столько же, сколько
-   в знакоместе. */
-const SOLID = 143;
-for (let i = 0; i < 8; i++) FONT[(SOLID - 32) * 8 + i] = 0xFF;
-
 const COLS = 64, ROWS = 24, CW = 8, CHH = 11, GH = 8;
+
+/* Четыре знака, которых в ПЗУ нет, дорисованы здесь — и рисуются во всю высоту
+   знакоместа, все 11 строк, а не восемь строк обычного начертания: клетка
+   фигуры должна смыкаться с соседней без щели.
+     130 — квадрат целиком, одна клетка широкого формата 40x24;
+     128 и 129 — его левая и правая половины, две клетки формата 80x24;
+     143 — сплошной блок, им выложен стакан.
+   На настоящем УКНЦ то же самое делал редактор шрифта с системной дискеты:
+   начертания лежат в ПЗУ периферийного процессора, таблица указателей на них —
+   в его ОЗУ, и своя картинка подставлялась подменой указателя. Из Бейсика туда
+   не дотянуться: POKE центрального процессора этой памяти не видит (проверено),
+   поэтому знакогенератор готовится до запуска программы. */
+const SOLID = 143;
+const EDGE = 0xFF, LEFT = 0xC0, RIGHT = 0x03, BOTH = 0xC3;
+function tallGlyph(middle) {
+  const rows = [EDGE, EDGE];
+  for (let i = 0; i < CHH - 4; i++) rows.push(middle);
+  rows.push(EDGE, EDGE);
+  return rows;
+}
+const TALL = new Map([
+  [130, tallGlyph(BOTH)],
+  [128, tallGlyph(LEFT)],
+  [129, tallGlyph(RIGHT)],
+  [SOLID, new Array(CHH).fill(0xFF)],
+]);
+/* В таблице знаков те же четыре рисуются обычным образом, восемью строками. */
+for (const [code, rows] of TALL) {
+  for (let i = 0; i < 8; i++) FONT[(code - 32) * 8 + i] = rows[i < 4 ? i : i + CHH - 8];
+}
 
 /* ------------------------------------------------------------------ экран */
 class Screen {
@@ -458,12 +483,16 @@ class Screen {
     this.col = 0;
     this.row = 0;
     this.dirty = true;
+    // Счётчик выводов: по нему отрисовка понимает, что на экране что-то
+    // изменилось, и только тогда пересчитывает набор клеток живой фигуры.
+    this.writes = 0;
   }
   cls() {
     this.cells.fill(32);
     this.col = 0;
     this.row = 0;
     this.dirty = true;
+    this.writes++;
   }
   locate(col, row) {
     if (col < 0 || col >= COLS) throw new BasicError("LOCATE: столбец " + col + " вне 0..63");
@@ -478,6 +507,7 @@ class Screen {
       this.col++;
     }
     this.dirty = true;
+    this.writes++;
   }
   newline() {
     this.col = 0;
@@ -510,7 +540,7 @@ class BasicError extends Error {}
 const KEYWORDS = new Set(["REM", "LET", "IF", "THEN", "ELSE", "GOTO", "GOSUB", "RETURN",
   "FOR", "TO", "STEP", "NEXT", "READ", "DATA", "RESTORE", "DIM", "END", "STOP", "PRINT",
   "COLOR", "CLS", "LOCATE", "BEEP", "ON", "AND", "OR", "NOT", "LIST", "RUN", "NEW"]);
-const FUNCS = new Set(["INT", "ABS", "RND", "SGN", "ASC", "LEN", "SQR", "CHR", "STRING", "INKEY"]);
+const FUNCS = new Set(["INT", "ABS", "RND", "SGN", "ASC", "LEN", "SQR", "CHR", "STRING", "INKEY", "MID", "VAL"]);
 
 const TOKEN_RE = /\s+|\d+\.\d*|\.\d+|\d+|"[^"]*"|[A-Z][A-Z0-9]*[%!#$]?|<>|<=|>=|[-+*/^=<>(),:;]/gy;
 
@@ -629,7 +659,8 @@ class Basic {
   dim(name, sizes) {
     let total = 1;
     for (const s of sizes) total *= s + 1;
-    this.arrays.set(this.canon(name), { dims: sizes, data: new Array(total).fill(0) });
+    const key = this.canon(name);
+    this.arrays.set(key, { dims: sizes, data: new Array(total).fill(key.endsWith("$") ? "" : 0) });
   }
 
   arrayOf(name) {
@@ -801,6 +832,18 @@ class Basic {
         return [koi7(String(args[0])[0]), i];
       case "CHR": return [String.fromCharCode(args[0]), i];
       case "STRING": return [String(args[1]).repeat(Math.trunc(args[0])), i];
+      /* MID$ у этой системы есть, а LEFT$ и SEG$ нет: на машине
+         PRINT LEFT$("ABCDE",3) отвечает ошибкой 13. Отсчёт с единицы. */
+      case "MID": {
+        const start = Math.trunc(args[1]);
+        if (start < 1) throw new BasicError("MID$: начало меньше единицы");
+        const len = args.length > 2 ? Math.trunc(args[2]) : args[0].length;
+        return [String(args[0]).substr(start - 1, len), i];
+      }
+      case "VAL": {
+        const v = parseFloat(args[0]);
+        return [isNaN(v) ? 0 : v, i];
+      }
     }
     throw new BasicError("нет функции " + base);
   }
@@ -1053,7 +1096,10 @@ const speedEl = document.getElementById("speed");
 let machine = null;
 let program = "diff";
 let wide = false;
-let cellCode = 79;      // знак клетки стакана; 79 — полый квадрат
+// Знак клетки: null — тот самый квадрат, дорисованный в знакогенераторе
+// (128 и 129 половинками в узком формате, 127 целиком в широком). Щелчок по
+// таблице знаков заменяет его любым знаком из ПЗУ машины.
+let cellCode = null;
 let inputLine = "";
 let lastCounters = [0, 0];
 let cursorOn = true;
@@ -1073,16 +1119,73 @@ function sourceFor(name) {
   // Ширина клетки — единственная строка, которой отличается широкий режим:
   // на машине формат экрана переключается меню УСТ, а программа только
   // узнаёт из CW%, сколько знаков занимает одна клетка стакана.
-  return SOURCES[name]
+  let src = SOURCES[name]
     .replace(/^105 CW%=\d+$/m, "105 CW%=" + (wide ? 1 : 2))
-    .replace(/^(\d+) CB\$=.*$/m, "$1 CB$=CHR$(" + cellCode + ")+\" \"")
-    .replace(/^(\d+) IF CW%=1 THEN CB\$=.*$/m, "$1 IF CW%=1 THEN CB$=CHR$(" + cellCode + ")")
     // Стены, пол и углы — один сплошной знак: на машине его надо сперва
     // нарисовать редактором шрифта, здесь он уже есть.
     .replace(/CHR\$\(164\)/g, "CHR$(143)")
     .replace(/CHR\$\(186\)/g, "CHR$(143)")
     .replace(/CHR\$\(166\)/g, "CHR$(143)")
     .replace(/CHR\$\(161\)/g, "CHR$(143)");
+  if (cellCode !== null) {
+    src = src
+      .replace(/^(\d+) CB\$=.*$/m, "$1 CB$=CHR$(" + cellCode + ")+\" \"")
+      .replace(/^(\d+) IF CW%=1 THEN CB\$=.*$/m, "$1 IF CW%=1 THEN CB$=CHR$(" + cellCode + ")");
+  }
+  return withRecords(src);
+}
+
+/* ------------------------------------------------------- таблица рекордов */
+/* Игра держит рекорды строками DATA, и дальше памяти машины они не живут: на
+   школьном УКНЦ сохранить их можно было только на дискету головного ПК, и то
+   через учителя. Роль головного ПК тут играет сама страница — таблицу она
+   держит в браузере и вписывает обратно в те же строки DATA. */
+const RECORDS_KEY = "uknc-tetris-records";
+const RECORD_ROWS = 5;
+let savedRecords = "";
+
+function loadRecords() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(RECORDS_KEY) || "null");
+    if (!Array.isArray(rows) || rows.length !== RECORD_ROWS) return null;
+    return rows.map((r) => [String(r[0] || "?").slice(0, 8), Math.round(Number(r[1]) || 0)]);
+  } catch (err) {
+    return null;                     // приватное окно или чужие данные в ключе
+  }
+}
+
+function withRecords(src) {
+  const rows = loadRecords();
+  if (!rows) return src;
+  let i = 0;
+  // Строки рекордов — единственные DATA с именем в кавычках.
+  return src.replace(/^(\d+) DATA "[^"]*",\d+$/gm, (line, number) => {
+    if (i >= rows.length) return line;
+    const row = rows[i++];
+    return number + ' DATA "' + row[0] + '",' + row[1];
+  });
+}
+
+function machineRecords() {
+  const rows = [];
+  for (let i = 0; i < RECORD_ROWS; i++) {
+    const name = machine.getArray("HS$", [i]);
+    const points = machine.getArray("HP", [i]);
+    if (typeof name !== "string" || !name.length) return null;
+    rows.push([name, Math.round(points)]);
+  }
+  return rows;
+}
+
+function keepRecords() {
+  const rows = machineRecords();
+  if (!rows) return;
+  const text = JSON.stringify(rows);
+  if (text === savedRecords) return;
+  savedRecords = text;
+  try {
+    localStorage.setItem(RECORDS_KEY, text);
+  } catch (err) { /* приватное окно: рекорды живут только до перезагрузки */ }
 }
 
 function boot() {
@@ -1121,33 +1224,62 @@ function updateCounters(force) {
 /* --------------------------------------------------- клетки живой фигуры */
 /* Игра держит текущую фигуру в CT/CR/CX/CY и таблицах SX/TY — по ним видно,
    какие знакоместа сейчас «живые». Прилипшие клетки этим набором не покрыты,
-   поэтому и рисуются тусклее. */
+   поэтому и рисуются тусклее.
+   Две тонкости, из-за которых набор нельзя брать в любой момент:
+   1. Проверяя, можно ли двинуться или повернуться, игра сдвигает CX/CY, зовёт
+      проверку столкновений и возвращает их назад. Кадр, пойманный в середине
+      этой проверки, показал бы фигуру за стеной или ниже дна — оттого стена и
+      дно вспыхивали белым, когда фигуру упирали в край.
+   2. Экран за такую проверку не меняется вовсе, поэтому набор пересчитывается
+      только после настоящего вывода на экран, а между ними держится прежний.
+   Плюс страховка от того же по смыслу: клетки за пределами стакана в набор не
+   попадают, что бы ни лежало в переменных. */
+let activeSet = new Set();
+let activeSeq = -1;
+
 function activeCells() {
+  if (machine.screen.writes === activeSeq) return activeSet;
+  activeSeq = machine.screen.writes;
   const set = new Set();
   try {
     const t = machine.getVar("CT%");
-    if (!t || t < 1 || t > 7) return set;
-    if (!machine.running) return set;
+    if (!t || t < 1 || t > 7 || !machine.running) { activeSet = set; return set; }
     const r = machine.getVar("CR%"), x = machine.getVar("CX%"), y = machine.getVar("CY%");
     const bx = machine.getVar("BX%"), by = machine.getVar("BY%"), cw = machine.getVar("CW%") || 2;
+    const bw = machine.getVar("BW%"), bh = machine.getVar("BH%");
     const si = (t - 1) * 4 + r;
     for (let i = 0; i < 4; i++) {
-      const col = bx + (x + machine.getArray("SX%", [si, i])) * cw;
-      const row = by + y + machine.getArray("TY%", [si, i]);
+      const cellX = x + machine.getArray("SX%", [si, i]);
+      const cellY = y + machine.getArray("TY%", [si, i]);
+      if (cellX < 0 || cellX >= bw || cellY < 0 || cellY >= bh) continue;
+      const col = bx + cellX * cw, row = by + cellY;
       if (row < 0 || row >= ROWS) continue;
       for (let k = 0; k < cw; k++) {
         if (col + k >= 0 && col + k < COLS) set.add(row * COLS + col + k);
       }
     }
   } catch (err) { /* до первой фигуры переменных ещё нет */ }
+  activeSet = set;
   return set;
 }
 
 /* ------------------------------------------------------------- отрисовка */
+/* Знакоместо на экране УКНЦ вдвое выше своей ширины: 640x288 точек растянуты на
+   экран 4:3, поэтому точка не квадратная. Картинка кадра считается в точках
+   машины (8 на 11), а вытягивается по вертикали уже разметкой — тогда клетка
+   стакана из двух знаков выходит квадратной, как на живой машине. */
+const CELL_ASPECT = 2;
+function setScreenShape(cols, cw) {
+  canvas.style.aspectRatio = (cols * cw) + " / " + (ROWS * CW * CELL_ASPECT);
+}
+
 function draw() {
   const cw = wide ? CW * 2 : CW;
   const cols = wide ? 40 : COLS;
-  if (canvas.width !== cols * cw) canvas.width = cols * cw;
+  if (canvas.width !== cols * cw) {
+    canvas.width = cols * cw;
+    setScreenShape(cols, cw);
+  }
   const img = ctx.createImageData(cols * cw, ROWS * CHH);
   const px = img.data;
   const bg = [11, 12, 12];
@@ -1156,8 +1288,11 @@ function draw() {
   const inkFrame = [120, 132, 136];
   const inkLocked = [168, 180, 183];
   const inkActive = [255, 255, 255];
-  const blockChar = machine.getVar("CB$");
-  const blockCode = blockChar && blockChar.length ? koi7(blockChar[0]) : -1;
+  // Клетка стакана — одна или две разные половины квадрата, и обе должны
+  // светиться как клетка, а не как рамка.
+  const blockChar = machine.getVar("CB$") || "";
+  const blockCodes = new Set();
+  for (const ch of blockChar) if (ch !== " ") blockCodes.add(koi7(ch));
   const active = activeCells();
   for (let i = 0; i < px.length; i += 4) {
     px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; px[i + 3] = 255;
@@ -1168,12 +1303,19 @@ function draw() {
       const idx = row * COLS + col;
       const code = machine.screen.cells[idx];
       if (code === 32) continue;
-      const ink = active.has(idx) ? inkActive : (code === blockCode ? inkLocked : inkFrame);
-      if (code === SOLID) {
+      const ink = active.has(idx) ? inkActive : (blockCodes.has(code) ? inkLocked : inkFrame);
+      const tall = TALL.get(code);
+      if (tall) {
         for (let dy = 0; dy < CHH; dy++) {
-          for (let dx = 0; dx < cw; dx++) {
-            const o = (((row * CHH + dy) * width) + col * cw + dx) * 4;
-            px[o] = ink[0]; px[o + 1] = ink[1]; px[o + 2] = ink[2];
+          const bits = tall[dy];
+          if (!bits) continue;
+          for (let dx = 0; dx < 8; dx++) {
+            if (!(bits & (0x80 >> dx))) continue;
+            const step = wide ? 2 : 1;
+            for (let k = 0; k < step; k++) {
+              const o = (((row * CHH + dy) * width) + col * cw + dx * step + k) * 4;
+              px[o] = ink[0]; px[o + 1] = ink[1]; px[o + 2] = ink[2];
+            }
           }
         }
         continue;
@@ -1210,6 +1352,25 @@ function draw() {
 /* --------------------------------------------------- таблица знаков машины */
 const charset = document.getElementById("charset");
 const charsetMsg = document.getElementById("charset-msg");
+const charsetReset = document.getElementById("charset-reset");
+const recordsClear = document.getElementById("records-clear");
+
+charsetReset.addEventListener("click", () => {
+  cellCode = null;
+  drawCharset();
+  charsetMsg.textContent = "Клетка стакана — дорисованный квадрат: знаки 128 и 129. Наберите RUN.";
+  charsetReset.hidden = true;
+  boot();
+});
+
+recordsClear.addEventListener("click", () => {
+  try {
+    localStorage.removeItem(RECORDS_KEY);
+  } catch (err) { /* приватное окно: стирать нечего */ }
+  savedRecords = "";
+  boot();
+  say("Таблица рекордов стёрта, в программе снова исходные строки DATA.");
+});
 const CHAR_SCALE = 3, CHAR_STEP = 8 * CHAR_SCALE + 2, CHAR_COLS = 16, CHAR_ROWS = 14;
 
 function drawCharset() {
@@ -1252,6 +1413,7 @@ charset.addEventListener("click", (e) => {
   cellCode = code;
   drawCharset();
   charsetMsg.textContent = "Клетка стакана — знак " + code + ". Программа перезаписана, наберите RUN.";
+  charsetReset.hidden = false;
   boot();
 });
 
@@ -1261,6 +1423,7 @@ function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
   cursorOn = Math.floor(now / 400) % 2 === 0;
+  keepRecords();
   if (machine.running) {
     const budget = Math.max(1, Math.round(parseInt(speedEl.value, 10) * dt));
     try {
@@ -1447,6 +1610,7 @@ for (const radio of document.querySelectorAll('input[name="prog"]')) {
   });
 }
 
+setScreenShape(COLS, CW);
 boot();
 drawCharset();
 requestAnimationFrame(frame);

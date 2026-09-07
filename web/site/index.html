@@ -385,11 +385,13 @@
     <p class="charset-note">Все 224 печатных знака из ПЗУ машины: 32-127 латиница и знаки,
       128-159 стрелки и служебные, 160-191 псевдографика, 192-255 кириллица. Выбранный знак
       сразу подставляется в программу — строка <code>CB$</code>.
-      Квадрата в наборе нет: знаки <b>127</b> (полый квадрат) и <b>143</b> (сплошной блок,
-      им выложен стакан) здесь дорисованы. На машине это делалось редактором шрифта с
-      системной дискеты — знакогенератор готовился до запуска программы.</p>
+      Квадрата в наборе нет вовсе, поэтому четыре знака дорисованы: <b>128</b> и <b>129</b> —
+      половинки квадрата (клетка формата 80×24 — это два знака), <b>130</b> — квадрат целиком
+      для широкого формата, <b>143</b> — сплошной блок, им выложен стакан. На машине это делал
+      редактор шрифта с системной дискеты: знакогенератор готовился до запуска программы.</p>
     <canvas id="charset" width="416" height="364" aria-label="Таблица знаков УКНЦ"></canvas>
-    <p class="msg" id="charset-msg">Сейчас клетка стакана — знак 79 (полый квадрат).</p>
+    <p class="msg" id="charset-msg">Сейчас клетка стакана — дорисованный квадрат: знаки 128 и 129.</p>
+    <p><button id="charset-reset" hidden>Вернуть квадрат</button></p>
   </details>
 
   <details open>
@@ -420,6 +422,12 @@
       <p>Один оператор в строке: двоеточия эта система не знает. Значимы <b>две первые буквы
         имени</b>, а <code>SC</code>, <code>SY</code>, <code>LP</code> и <code>PO</code> заняты
         системой. Графики нет вовсе, поэтому тетрис текстовый.</p>
+    </section>
+    <section>
+      <h3>Таблица рекордов</h3>
+      <p>Пять строк, попал — вводишь имя. Страница играет роль головного ПК: таблицу она
+        держит у себя и вписывает обратно в те же строки <code>DATA</code>, так что рекорды
+        переживают перезагрузку. <button id="records-clear">Стереть таблицу</button></p>
     </section>
     <section>
       <h3>Откуда числа задержек</h3>
@@ -464,6 +472,8 @@
 32 REM 500 GAME OVER, 1000 KEYS, 2000 SPAWN, 3000 MOVES, 3300 COLLIDE,
 33 REM 4000 ROTATE, 5000 DIFF, 6000 LOCK AND LINES, 7000 HUD,
 34 REM 8000 CELL PRINTING, 9000 DEBUG, 10000 DATA.
+35 REM  HS HP RECORD NAMES AND POINTS   HI NEW ROW IN THE TABLE
+36 REM  HN NAME BEING TYPED IN          7400 RECORDS, 7500 TABLE
 99 GOTO 100
 100 REM ---------------- CONFIGURATION ----------------
 101 BW%=10
@@ -480,22 +490,26 @@
 112 REM 80 COLUMNS, WHERE ONE CELL NEEDS TWO. SWITCH THE TERMINAL TO
 113 REM 40X24 WITH THE UST KEY (SYSTEM MENU, "FORMAT EKRANA") AND SET
 114 REM CW%=1 - THEN ONE WIDE CHARACTER IS ONE CELL.
-115 REM A CELL IS THE LETTER O: THIS ROM FONT DRAWS IT AS A HOLLOW
-116 REM SQUARE, AND NO PSEUDOGRAPHIC CHARACTER OF THAT SHAPE EXISTS -
-117 REM THE 160..191 SET IS ALL LINES AND CORNERS. THE WELL ITSELF IS
-118 REM MADE OF THAT SET: 164 IS A DOUBLE WALL, 186 A DOUBLE FLOOR,
-119 REM 166 AND 161 ITS CORNERS. THE TOP BAR IS NOT DRAWN AT ALL.
-120 CB$="O "
-121 CE$="  "
-122 IF CW%=1 THEN CB$="O"
-123 IF CW%=1 THEN CE$=" "
-124 HX%=BX%+BW%*CW%+4
+115 REM A CELL IS A SQUARE WITH A THICK BORDER, THE WAY THE TETRIS WE
+116 REM REMEMBER DREW IT. NO SUCH CHARACTER EXISTS IN THE ROM FONT -
+117 REM 160..191 IS ALL LINES AND CORNERS - SO 128, 129 AND 130 ARE
+118 REM REDRAWN BEFORE THE RUN BY THE FONT EDITOR OFF THE SYSTEM DISK:
+119 REM 128 IS THE LEFT HALF OF THE SQUARE, 129 THE RIGHT HALF, 130 THE
+120 REM WHOLE SQUARE FOR THE WIDE FORMAT. ALL THREE HAVE A GLYPH IN THE
+121 REM STOCK ROM - ARROWS - SO AN UNPREPARED MACHINE STILL PLAYS.
+122 CB$=CHR$(128)+CHR$(129)
+123 CE$="  "
+124 IF CW%=1 THEN CB$=CHR$(130)
+125 IF CW%=1 THEN CE$=" "
+126 HX%=BX%+BW%*CW%+4
 130 DIM BD%(9,19),SX%(27,3),TY%(27,3)
 131 DIM NR%(7),SP%(7)
 132 DIM KX%(9),KY%(9)
 133 DIM GD%(9),LD%(9),AG%(9)
 134 DIM AX%(3),AY%(3),NX%(3),NY%(3)
 135 DIM KA%(23),KV%(23)
+136 DIM HS$(4),HP(4)
+137 HI%=-1
 200 REM ---------------- TABLES FROM DATA ----------------
 201 FOR Z%=1 TO 7
 202 READ NR%(Z%),SP%(Z%)
@@ -523,28 +537,42 @@
 224 FOR I%=0 TO NK%-1
 225 READ KA%(I%),KV%(I%)
 226 NEXT I%
-250 REM ---------------- TITLE AND SEED ----------------
-252 CLS
-253 LOCATE 24,8
-254 PRINT "T E T R I S"
-255 LOCATE 18,11
-256 PRINT "ARROWS - MOVE, UP TURNS, DOWN DROPS"
-257 LOCATE 18,12
-258 PRINT "SPACE - DROP, P - PAUSE, Q - QUIT"
-259 LOCATE 18,13
-260 PRINT "A D W S AND 7 9 8 5 WORK TOO"
-261 LOCATE 18,16
-262 PRINT "PRESS ANY KEY"
-263 RC%=0
-264 KB$=INKEY$
-265 IF KB$<>"" THEN GOTO 270
-266 RC%=RC%+1
-267 IF RC%>30000 THEN RC%=0
-268 GOTO 264
-270 Z%=RC%-INT(RC%/23)*23
-271 FOR I%=0 TO Z%
-272 W%=INT(RND(1)*7)
-273 NEXT I%
+230 FOR I%=0 TO 4
+231 READ HS$(I%),HP(I%)
+232 NEXT I%
+250 REM ---------------- TITLE, RECORDS AND LEVEL ----------------
+251 REM THE KEY THAT STARTS THE GAME ALSO CHOOSES THE LEVEL: A DIGIT
+252 REM STARTS AT THAT LEVEL, ANYTHING ELSE AT ZERO. ONE PRESS EITHER
+253 REM WAY - THERE IS NO SEPARATE MENU TO WALK THROUGH.
+254 CLS
+255 LOCATE 26,1
+256 PRINT "T E T R I S"
+257 LOCATE 14,3
+258 PRINT "ARROWS - MOVE, UP TURNS, DOWN DROPS"
+259 LOCATE 14,4
+260 PRINT "SPACE - DROP, P - PAUSE, Q - QUIT"
+261 LOCATE 14,5
+262 PRINT "A D W S AND 7 9 8 5 WORK TOO"
+263 GOSUB 7500
+264 LOCATE 14,17
+265 PRINT "PRESS 0 - 9 TO START AT THAT LEVEL"
+266 LOCATE 14,18
+267 PRINT "ANY OTHER KEY STARTS AT LEVEL 0"
+268 RC%=0
+269 KB$=INKEY$
+270 IF KB$<>"" THEN GOTO 275
+271 RC%=RC%+1
+272 IF RC%>30000 THEN RC%=0
+273 GOTO 269
+275 SL%=0
+276 KC%=ASC(KB$)
+277 IF KC%<48 THEN GOTO 280
+278 IF KC%>57 THEN GOTO 280
+279 SL%=KC%-48
+280 Z%=RC%-INT(RC%/23)*23
+281 FOR I%=0 TO Z%
+282 W%=INT(RND(1)*7)
+283 NEXT I%
 300 REM ---------------- NEW GAME ----------------
 301 FOR Y%=0 TO BH%-1
 302 FOR X%=0 TO BW%-1
@@ -582,18 +610,19 @@
 501 IF FL%=2 THEN GOTO 560
 504 LOCATE HX%,18
 505 PRINT "GAME OVER"
-506 LOCATE HX%,20
-507 PRINT "P - PLAY AGAIN"
-508 LOCATE HX%,21
-509 PRINT "Q - QUIT"
-510 KB$=INKEY$
-511 IF KB$="" THEN GOTO 510
-512 KC%=ASC(KB$)
-513 IF KC%=80 THEN GOTO 300
-514 IF KC%=112 THEN GOTO 300
-515 IF KC%=81 THEN GOTO 560
-516 IF KC%=113 THEN GOTO 560
-517 GOTO 510
+506 GOSUB 7400
+507 LOCATE HX%,20
+508 PRINT "P - PLAY AGAIN"
+509 LOCATE HX%,21
+510 PRINT "Q - QUIT"
+511 KB$=INKEY$
+512 IF KB$="" THEN GOTO 511
+513 KC%=ASC(KB$)
+514 IF KC%=80 THEN GOTO 250
+515 IF KC%=112 THEN GOTO 250
+516 IF KC%=81 THEN GOTO 560
+517 IF KC%=113 THEN GOTO 560
+518 GOTO 511
 560 CLS
 562 END
 1000 REM ---- READ ONE KEY, OUT AK% ----
@@ -923,6 +952,9 @@
 6209 GOSUB 7100
 6210 GOSUB 7200
 6211 RETURN
+6997 REM THE WELL IS BUILT OF THE PSEUDOGRAPHIC SET: 164 IS A DOUBLE
+6998 REM WALL, 186 A DOUBLE FLOOR, 166 AND 161 ITS CORNERS. THE TOP BAR
+6999 REM IS NOT DRAWN AT ALL - THE PIECE COMES IN THROUGH IT.
 7000 REM ---- STATIC SCREEN: WELL AND LABELS ----
 7001 CLS
 7002 FOR Y%=0 TO BH%-1
@@ -968,6 +1000,77 @@
 7316 NEXT I%
 7317 PV%=NT%
 7318 RETURN
+7400 REM ---- RECORDS: PUT SR IN THE TABLE IF IT FITS ----
+7401 REM THE TABLE HOLDS FIVE ROWS SORTED BY POINTS. A SCORE THAT BEATS
+7402 REM THE LAST ROW ASKS FOR A NAME AND PUSHES THE ROWS BELOW IT DOWN.
+7403 REM HI% IS THE ROW THAT WAS JUST WON, -1 IF NONE: THE TITLE SCREEN
+7404 REM MARKS IT SO THE PLAYER SEES WHERE HE LANDED.
+7405 HI%=-1
+7406 IF SR<=HP(4) THEN RETURN
+7407 GOSUB 7450
+7408 HI%=4
+7409 IF HI%=0 THEN GOTO 7415
+7410 IF SR<=HP(HI%-1) THEN GOTO 7415
+7411 HS$(HI%)=HS$(HI%-1)
+7412 HP(HI%)=HP(HI%-1)
+7413 HI%=HI%-1
+7414 GOTO 7409
+7415 HS$(HI%)=HN$
+7416 HP(HI%)=SR
+7417 RETURN
+7450 REM ---- TYPE A NAME INTO HN$, UP TO EIGHT CHARACTERS ----
+7451 REM ONE KEY AT A TIME THROUGH INKEY$: THE PROGRAM NEVER BLOCKS ON
+7452 REM INPUT ANYWHERE, AND THE ARROW KEYS ARRIVE AS ESC PLUS A LETTER,
+7453 REM SO THE LETTER AFTER AN ESC IS DROPPED INSTEAD OF TYPED IN.
+7454 HN$=""
+7455 ES%=0
+7456 LOCATE HX%,20
+7457 PRINT "NAME:"
+7458 LOCATE HX%,21
+7459 PRINT HN$;"_        ";
+7460 KB$=INKEY$
+7461 IF KB$="" THEN GOTO 7460
+7462 KC%=ASC(KB$)
+7463 IF KC%<>27 THEN GOTO 7466
+7464 ES%=1
+7465 GOTO 7460
+7466 IF ES%=0 THEN GOTO 7469
+7467 ES%=0
+7468 GOTO 7460
+7469 IF KC%=13 THEN GOTO 7485
+7470 IF KC%=10 THEN GOTO 7485
+7471 IF KC%=8 THEN GOTO 7476
+7472 IF KC%=24 THEN GOTO 7476
+7473 IF KC%=127 THEN GOTO 7476
+7474 IF KC%<=32 THEN GOTO 7460
+7475 GOTO 7478
+7476 IF LEN(HN$)>0 THEN HN$=MID$(HN$,1,LEN(HN$)-1)
+7477 GOTO 7458
+7478 IF LEN(HN$)>=8 THEN GOTO 7460
+7479 HN$=HN$+KB$
+7480 GOTO 7458
+7485 IF LEN(HN$)=0 THEN HN$="?"
+7486 LOCATE HX%,20
+7487 PRINT "          "
+7488 LOCATE HX%,21
+7489 PRINT "          "
+7490 RETURN
+7491 REM THE SPACE BAR IS DROPPED TOO, THOUGH IT IS A PRINTABLE CHARACTER:
+7492 REM IT IS THE DROP KEY, AND THE PRESSES LEFT OVER FROM THE LAST SECONDS
+7493 REM OF THE GAME WOULD OTHERWISE FILL THE NAME WITH BLANKS BEFORE THE
+7494 REM PLAYER GOT TO THE KEYBOARD. SEEN ON THE MACHINE, NOT GUESSED.
+7500 REM ---- PRINT THE RECORDS TABLE ON THE TITLE SCREEN ----
+7501 LOCATE 26,7
+7502 PRINT "RECORDS"
+7503 FOR I%=0 TO 4
+7504 LOCATE 22,9+I%
+7505 IF I%=HI% THEN PRINT ">";
+7506 IF I%<>HI% THEN PRINT " ";
+7507 PRINT HS$(I%);
+7508 PRINT STRING$(10-LEN(HS$(I%))," ");
+7509 PRINT HP(I%)
+7510 NEXT I%
+7511 RETURN
 8000 REM ---- PRINT A BLOCK AT WELL CELL GX% GY% ----
 8001 IF GY%<0 THEN RETURN
 8003 LOCATE BX%+GX%*CW%,BY%+GY%
@@ -1059,7 +1162,19 @@
 10311 DATA 32,5
 10312 DATA 80,6, 112,6
 10313 DATA 81,7, 113,7
-10314 DATA 55,1, 57,2, 53,3, 56,4</script>
+10314 DATA 55,1, 57,2, 53,3, 56,4
+10400 REM ================= RECORDS =================
+10401 REM FIVE ROWS, BEST FIRST: NAME AND POINTS. THESE ARE THE ROWS THE
+10402 REM GAME STARTS WITH; A NEW RECORD ONLY LIVES AS LONG AS THE
+10403 REM PROGRAM STAYS IN MEMORY. ON THE SCHOOL MACHINE KEEPING IT
+10404 REM MEANT THE HEAD PC: ASK THE TEACHER TO PUT THE FLOPPY IN, RUN
+10405 REM THE SAVE, AND HAVE HIM CONFIRM IT. THE WEB PAGE PLAYS THAT
+10406 REM PART OF THE TEACHER AND REWRITES THE FIVE LINES BELOW.
+10410 DATA "URIY",3000
+10411 DATA "IRA",2200
+10412 DATA "SEVA",1500
+10413 DATA "OLEG",900
+10414 DATA "NINA",400</script>
 <script type="text/plain" id="src-classic">1 REM ***************************************************************
 2 REM * TETRIS FOR UKNC (ELEKTRONIKA MS 0511), CASSETTE BASIC        *
 3 REM * VILNIUS 1988.09.28, TEXT SCREEN 64X24.                       *
@@ -1094,6 +1209,8 @@
 32 REM 500 GAME OVER, 1000 KEYS, 2000 SPAWN, 3000 MOVES, 3300 COLLIDE,
 33 REM 4000 ROTATE, 5000 DIFF, 6000 LOCK AND LINES, 7000 HUD,
 34 REM 8000 CELL PRINTING, 9000 DEBUG, 10000 DATA.
+35 REM  HS HP RECORD NAMES AND POINTS   HI NEW ROW IN THE TABLE
+36 REM  HN NAME BEING TYPED IN          7400 RECORDS, 7500 TABLE
 99 GOTO 100
 100 REM ---------------- CONFIGURATION ----------------
 101 BW%=10
@@ -1110,22 +1227,26 @@
 112 REM 80 COLUMNS, WHERE ONE CELL NEEDS TWO. SWITCH THE TERMINAL TO
 113 REM 40X24 WITH THE UST KEY (SYSTEM MENU, "FORMAT EKRANA") AND SET
 114 REM CW%=1 - THEN ONE WIDE CHARACTER IS ONE CELL.
-115 REM A CELL IS THE LETTER O: THIS ROM FONT DRAWS IT AS A HOLLOW
-116 REM SQUARE, AND NO PSEUDOGRAPHIC CHARACTER OF THAT SHAPE EXISTS -
-117 REM THE 160..191 SET IS ALL LINES AND CORNERS. THE WELL ITSELF IS
-118 REM MADE OF THAT SET: 164 IS A DOUBLE WALL, 186 A DOUBLE FLOOR,
-119 REM 166 AND 161 ITS CORNERS. THE TOP BAR IS NOT DRAWN AT ALL.
-120 CB$="O "
-121 CE$="  "
-122 IF CW%=1 THEN CB$="O"
-123 IF CW%=1 THEN CE$=" "
-124 HX%=BX%+BW%*CW%+4
+115 REM A CELL IS A SQUARE WITH A THICK BORDER, THE WAY THE TETRIS WE
+116 REM REMEMBER DREW IT. NO SUCH CHARACTER EXISTS IN THE ROM FONT -
+117 REM 160..191 IS ALL LINES AND CORNERS - SO 128, 129 AND 130 ARE
+118 REM REDRAWN BEFORE THE RUN BY THE FONT EDITOR OFF THE SYSTEM DISK:
+119 REM 128 IS THE LEFT HALF OF THE SQUARE, 129 THE RIGHT HALF, 130 THE
+120 REM WHOLE SQUARE FOR THE WIDE FORMAT. ALL THREE HAVE A GLYPH IN THE
+121 REM STOCK ROM - ARROWS - SO AN UNPREPARED MACHINE STILL PLAYS.
+122 CB$=CHR$(128)+CHR$(129)
+123 CE$="  "
+124 IF CW%=1 THEN CB$=CHR$(130)
+125 IF CW%=1 THEN CE$=" "
+126 HX%=BX%+BW%*CW%+4
 130 DIM BD%(9,19),SX%(27,3),TY%(27,3)
 131 DIM NR%(7),SP%(7)
 132 DIM KX%(9),KY%(9)
 133 DIM GD%(9),LD%(9),AG%(9)
 134 DIM AX%(3),AY%(3),NX%(3),NY%(3)
 135 DIM KA%(23),KV%(23)
+136 DIM HS$(4),HP(4)
+137 HI%=-1
 200 REM ---------------- TABLES FROM DATA ----------------
 201 FOR Z%=1 TO 7
 202 READ NR%(Z%),SP%(Z%)
@@ -1153,28 +1274,42 @@
 224 FOR I%=0 TO NK%-1
 225 READ KA%(I%),KV%(I%)
 226 NEXT I%
-250 REM ---------------- TITLE AND SEED ----------------
-252 CLS
-253 LOCATE 24,8
-254 PRINT "T E T R I S"
-255 LOCATE 18,11
-256 PRINT "ARROWS - MOVE, UP TURNS, DOWN DROPS"
-257 LOCATE 18,12
-258 PRINT "SPACE - DROP, P - PAUSE, Q - QUIT"
-259 LOCATE 18,13
-260 PRINT "A D W S AND 7 9 8 5 WORK TOO"
-261 LOCATE 18,16
-262 PRINT "PRESS ANY KEY"
-263 RC%=0
-264 KB$=INKEY$
-265 IF KB$<>"" THEN GOTO 270
-266 RC%=RC%+1
-267 IF RC%>30000 THEN RC%=0
-268 GOTO 264
-270 Z%=RC%-INT(RC%/23)*23
-271 FOR I%=0 TO Z%
-272 W%=INT(RND(1)*7)
-273 NEXT I%
+230 FOR I%=0 TO 4
+231 READ HS$(I%),HP(I%)
+232 NEXT I%
+250 REM ---------------- TITLE, RECORDS AND LEVEL ----------------
+251 REM THE KEY THAT STARTS THE GAME ALSO CHOOSES THE LEVEL: A DIGIT
+252 REM STARTS AT THAT LEVEL, ANYTHING ELSE AT ZERO. ONE PRESS EITHER
+253 REM WAY - THERE IS NO SEPARATE MENU TO WALK THROUGH.
+254 CLS
+255 LOCATE 26,1
+256 PRINT "T E T R I S"
+257 LOCATE 14,3
+258 PRINT "ARROWS - MOVE, UP TURNS, DOWN DROPS"
+259 LOCATE 14,4
+260 PRINT "SPACE - DROP, P - PAUSE, Q - QUIT"
+261 LOCATE 14,5
+262 PRINT "A D W S AND 7 9 8 5 WORK TOO"
+263 GOSUB 7500
+264 LOCATE 14,17
+265 PRINT "PRESS 0 - 9 TO START AT THAT LEVEL"
+266 LOCATE 14,18
+267 PRINT "ANY OTHER KEY STARTS AT LEVEL 0"
+268 RC%=0
+269 KB$=INKEY$
+270 IF KB$<>"" THEN GOTO 275
+271 RC%=RC%+1
+272 IF RC%>30000 THEN RC%=0
+273 GOTO 269
+275 SL%=0
+276 KC%=ASC(KB$)
+277 IF KC%<48 THEN GOTO 280
+278 IF KC%>57 THEN GOTO 280
+279 SL%=KC%-48
+280 Z%=RC%-INT(RC%/23)*23
+281 FOR I%=0 TO Z%
+282 W%=INT(RND(1)*7)
+283 NEXT I%
 300 REM ---------------- NEW GAME ----------------
 301 FOR Y%=0 TO BH%-1
 302 FOR X%=0 TO BW%-1
@@ -1212,18 +1347,19 @@
 501 IF FL%=2 THEN GOTO 560
 504 LOCATE HX%,18
 505 PRINT "GAME OVER"
-506 LOCATE HX%,20
-507 PRINT "P - PLAY AGAIN"
-508 LOCATE HX%,21
-509 PRINT "Q - QUIT"
-510 KB$=INKEY$
-511 IF KB$="" THEN GOTO 510
-512 KC%=ASC(KB$)
-513 IF KC%=80 THEN GOTO 300
-514 IF KC%=112 THEN GOTO 300
-515 IF KC%=81 THEN GOTO 560
-516 IF KC%=113 THEN GOTO 560
-517 GOTO 510
+506 GOSUB 7400
+507 LOCATE HX%,20
+508 PRINT "P - PLAY AGAIN"
+509 LOCATE HX%,21
+510 PRINT "Q - QUIT"
+511 KB$=INKEY$
+512 IF KB$="" THEN GOTO 511
+513 KC%=ASC(KB$)
+514 IF KC%=80 THEN GOTO 250
+515 IF KC%=112 THEN GOTO 250
+516 IF KC%=81 THEN GOTO 560
+517 IF KC%=113 THEN GOTO 560
+518 GOTO 511
 560 CLS
 562 END
 1000 REM ---- READ ONE KEY, OUT AK% ----
@@ -1538,6 +1674,9 @@
 6209 GOSUB 7100
 6210 GOSUB 7200
 6211 RETURN
+6997 REM THE WELL IS BUILT OF THE PSEUDOGRAPHIC SET: 164 IS A DOUBLE
+6998 REM WALL, 186 A DOUBLE FLOOR, 166 AND 161 ITS CORNERS. THE TOP BAR
+6999 REM IS NOT DRAWN AT ALL - THE PIECE COMES IN THROUGH IT.
 7000 REM ---- STATIC SCREEN: WELL AND LABELS ----
 7001 CLS
 7002 FOR Y%=0 TO BH%-1
@@ -1583,6 +1722,77 @@
 7316 NEXT I%
 7317 PV%=NT%
 7318 RETURN
+7400 REM ---- RECORDS: PUT SR IN THE TABLE IF IT FITS ----
+7401 REM THE TABLE HOLDS FIVE ROWS SORTED BY POINTS. A SCORE THAT BEATS
+7402 REM THE LAST ROW ASKS FOR A NAME AND PUSHES THE ROWS BELOW IT DOWN.
+7403 REM HI% IS THE ROW THAT WAS JUST WON, -1 IF NONE: THE TITLE SCREEN
+7404 REM MARKS IT SO THE PLAYER SEES WHERE HE LANDED.
+7405 HI%=-1
+7406 IF SR<=HP(4) THEN RETURN
+7407 GOSUB 7450
+7408 HI%=4
+7409 IF HI%=0 THEN GOTO 7415
+7410 IF SR<=HP(HI%-1) THEN GOTO 7415
+7411 HS$(HI%)=HS$(HI%-1)
+7412 HP(HI%)=HP(HI%-1)
+7413 HI%=HI%-1
+7414 GOTO 7409
+7415 HS$(HI%)=HN$
+7416 HP(HI%)=SR
+7417 RETURN
+7450 REM ---- TYPE A NAME INTO HN$, UP TO EIGHT CHARACTERS ----
+7451 REM ONE KEY AT A TIME THROUGH INKEY$: THE PROGRAM NEVER BLOCKS ON
+7452 REM INPUT ANYWHERE, AND THE ARROW KEYS ARRIVE AS ESC PLUS A LETTER,
+7453 REM SO THE LETTER AFTER AN ESC IS DROPPED INSTEAD OF TYPED IN.
+7454 HN$=""
+7455 ES%=0
+7456 LOCATE HX%,20
+7457 PRINT "NAME:"
+7458 LOCATE HX%,21
+7459 PRINT HN$;"_        ";
+7460 KB$=INKEY$
+7461 IF KB$="" THEN GOTO 7460
+7462 KC%=ASC(KB$)
+7463 IF KC%<>27 THEN GOTO 7466
+7464 ES%=1
+7465 GOTO 7460
+7466 IF ES%=0 THEN GOTO 7469
+7467 ES%=0
+7468 GOTO 7460
+7469 IF KC%=13 THEN GOTO 7485
+7470 IF KC%=10 THEN GOTO 7485
+7471 IF KC%=8 THEN GOTO 7476
+7472 IF KC%=24 THEN GOTO 7476
+7473 IF KC%=127 THEN GOTO 7476
+7474 IF KC%<=32 THEN GOTO 7460
+7475 GOTO 7478
+7476 IF LEN(HN$)>0 THEN HN$=MID$(HN$,1,LEN(HN$)-1)
+7477 GOTO 7458
+7478 IF LEN(HN$)>=8 THEN GOTO 7460
+7479 HN$=HN$+KB$
+7480 GOTO 7458
+7485 IF LEN(HN$)=0 THEN HN$="?"
+7486 LOCATE HX%,20
+7487 PRINT "          "
+7488 LOCATE HX%,21
+7489 PRINT "          "
+7490 RETURN
+7491 REM THE SPACE BAR IS DROPPED TOO, THOUGH IT IS A PRINTABLE CHARACTER:
+7492 REM IT IS THE DROP KEY, AND THE PRESSES LEFT OVER FROM THE LAST SECONDS
+7493 REM OF THE GAME WOULD OTHERWISE FILL THE NAME WITH BLANKS BEFORE THE
+7494 REM PLAYER GOT TO THE KEYBOARD. SEEN ON THE MACHINE, NOT GUESSED.
+7500 REM ---- PRINT THE RECORDS TABLE ON THE TITLE SCREEN ----
+7501 LOCATE 26,7
+7502 PRINT "RECORDS"
+7503 FOR I%=0 TO 4
+7504 LOCATE 22,9+I%
+7505 IF I%=HI% THEN PRINT ">";
+7506 IF I%<>HI% THEN PRINT " ";
+7507 PRINT HS$(I%);
+7508 PRINT STRING$(10-LEN(HS$(I%))," ");
+7509 PRINT HP(I%)
+7510 NEXT I%
+7511 RETURN
 8000 REM ---- PRINT A BLOCK AT WELL CELL GX% GY% ----
 8001 IF GY%<0 THEN RETURN
 8003 LOCATE BX%+GX%*CW%,BY%+GY%
@@ -1674,7 +1884,19 @@
 10311 DATA 32,5
 10312 DATA 80,6, 112,6
 10313 DATA 81,7, 113,7
-10314 DATA 55,1, 57,2, 53,3, 56,4</script>
+10314 DATA 55,1, 57,2, 53,3, 56,4
+10400 REM ================= RECORDS =================
+10401 REM FIVE ROWS, BEST FIRST: NAME AND POINTS. THESE ARE THE ROWS THE
+10402 REM GAME STARTS WITH; A NEW RECORD ONLY LIVES AS LONG AS THE
+10403 REM PROGRAM STAYS IN MEMORY. ON THE SCHOOL MACHINE KEEPING IT
+10404 REM MEANT THE HEAD PC: ASK THE TEACHER TO PUT THE FLOPPY IN, RUN
+10405 REM THE SAVE, AND HAVE HIM CONFIRM IT. THE WEB PAGE PLAYS THAT
+10406 REM PART OF THE TEACHER AND REWRITES THE FIVE LINES BELOW.
+10410 DATA "URIY",3000
+10411 DATA "IRA",2200
+10412 DATA "SEVA",1500
+10413 DATA "OLEG",900
+10414 DATA "NINA",400</script>
 
 <script>
 "use strict";
@@ -1685,20 +1907,37 @@ const FONT_HEX = "000000000000000010101010101000104848900000000000004848fc48fc48
 const FONT = new Uint8Array(FONT_HEX.length / 2);
 for (let i = 0; i < FONT.length; i++) FONT[i] = parseInt(FONT_HEX.substr(i * 2, 2), 16);
 
-/* Знак 127 в ПЗУ пуст, и здесь он занят полым квадратом — тем самым, которого
-   в наборе машины нет. На настоящем УКНЦ так и делали: начертания лежат в ПЗУ
-   периферийного процессора, а таблица указателей на них — в его ОЗУ, и своя
-   картинка подставлялась подменой указателя. Из Бейсика туда не дотянуться:
-   POKE центрального процессора этой памяти не видит (проверено). */
-const SQUARE = [0x00, 0x7e, 0x42, 0x42, 0x42, 0x42, 0x42, 0x7e];
-for (let i = 0; i < 8; i++) FONT[(127 - 32) * 8 + i] = SQUARE[i];
-/* Знак 143 — сплошной блок: им выложен стакан. Рисуется во всю клетку, а не в
-   восемь строк начертания: настоящий знак и есть 11 строк, столько же, сколько
-   в знакоместе. */
-const SOLID = 143;
-for (let i = 0; i < 8; i++) FONT[(SOLID - 32) * 8 + i] = 0xFF;
-
 const COLS = 64, ROWS = 24, CW = 8, CHH = 11, GH = 8;
+
+/* Четыре знака, которых в ПЗУ нет, дорисованы здесь — и рисуются во всю высоту
+   знакоместа, все 11 строк, а не восемь строк обычного начертания: клетка
+   фигуры должна смыкаться с соседней без щели.
+     130 — квадрат целиком, одна клетка широкого формата 40x24;
+     128 и 129 — его левая и правая половины, две клетки формата 80x24;
+     143 — сплошной блок, им выложен стакан.
+   На настоящем УКНЦ то же самое делал редактор шрифта с системной дискеты:
+   начертания лежат в ПЗУ периферийного процессора, таблица указателей на них —
+   в его ОЗУ, и своя картинка подставлялась подменой указателя. Из Бейсика туда
+   не дотянуться: POKE центрального процессора этой памяти не видит (проверено),
+   поэтому знакогенератор готовится до запуска программы. */
+const SOLID = 143;
+const EDGE = 0xFF, LEFT = 0xC0, RIGHT = 0x03, BOTH = 0xC3;
+function tallGlyph(middle) {
+  const rows = [EDGE, EDGE];
+  for (let i = 0; i < CHH - 4; i++) rows.push(middle);
+  rows.push(EDGE, EDGE);
+  return rows;
+}
+const TALL = new Map([
+  [130, tallGlyph(BOTH)],
+  [128, tallGlyph(LEFT)],
+  [129, tallGlyph(RIGHT)],
+  [SOLID, new Array(CHH).fill(0xFF)],
+]);
+/* В таблице знаков те же четыре рисуются обычным образом, восемью строками. */
+for (const [code, rows] of TALL) {
+  for (let i = 0; i < 8; i++) FONT[(code - 32) * 8 + i] = rows[i < 4 ? i : i + CHH - 8];
+}
 
 /* ------------------------------------------------------------------ экран */
 class Screen {
@@ -1707,12 +1946,16 @@ class Screen {
     this.col = 0;
     this.row = 0;
     this.dirty = true;
+    // Счётчик выводов: по нему отрисовка понимает, что на экране что-то
+    // изменилось, и только тогда пересчитывает набор клеток живой фигуры.
+    this.writes = 0;
   }
   cls() {
     this.cells.fill(32);
     this.col = 0;
     this.row = 0;
     this.dirty = true;
+    this.writes++;
   }
   locate(col, row) {
     if (col < 0 || col >= COLS) throw new BasicError("LOCATE: столбец " + col + " вне 0..63");
@@ -1727,6 +1970,7 @@ class Screen {
       this.col++;
     }
     this.dirty = true;
+    this.writes++;
   }
   newline() {
     this.col = 0;
@@ -1759,7 +2003,7 @@ class BasicError extends Error {}
 const KEYWORDS = new Set(["REM", "LET", "IF", "THEN", "ELSE", "GOTO", "GOSUB", "RETURN",
   "FOR", "TO", "STEP", "NEXT", "READ", "DATA", "RESTORE", "DIM", "END", "STOP", "PRINT",
   "COLOR", "CLS", "LOCATE", "BEEP", "ON", "AND", "OR", "NOT", "LIST", "RUN", "NEW"]);
-const FUNCS = new Set(["INT", "ABS", "RND", "SGN", "ASC", "LEN", "SQR", "CHR", "STRING", "INKEY"]);
+const FUNCS = new Set(["INT", "ABS", "RND", "SGN", "ASC", "LEN", "SQR", "CHR", "STRING", "INKEY", "MID", "VAL"]);
 
 const TOKEN_RE = /\s+|\d+\.\d*|\.\d+|\d+|"[^"]*"|[A-Z][A-Z0-9]*[%!#$]?|<>|<=|>=|[-+*/^=<>(),:;]/gy;
 
@@ -1878,7 +2122,8 @@ class Basic {
   dim(name, sizes) {
     let total = 1;
     for (const s of sizes) total *= s + 1;
-    this.arrays.set(this.canon(name), { dims: sizes, data: new Array(total).fill(0) });
+    const key = this.canon(name);
+    this.arrays.set(key, { dims: sizes, data: new Array(total).fill(key.endsWith("$") ? "" : 0) });
   }
 
   arrayOf(name) {
@@ -2050,6 +2295,18 @@ class Basic {
         return [koi7(String(args[0])[0]), i];
       case "CHR": return [String.fromCharCode(args[0]), i];
       case "STRING": return [String(args[1]).repeat(Math.trunc(args[0])), i];
+      /* MID$ у этой системы есть, а LEFT$ и SEG$ нет: на машине
+         PRINT LEFT$("ABCDE",3) отвечает ошибкой 13. Отсчёт с единицы. */
+      case "MID": {
+        const start = Math.trunc(args[1]);
+        if (start < 1) throw new BasicError("MID$: начало меньше единицы");
+        const len = args.length > 2 ? Math.trunc(args[2]) : args[0].length;
+        return [String(args[0]).substr(start - 1, len), i];
+      }
+      case "VAL": {
+        const v = parseFloat(args[0]);
+        return [isNaN(v) ? 0 : v, i];
+      }
     }
     throw new BasicError("нет функции " + base);
   }
@@ -2302,7 +2559,10 @@ const speedEl = document.getElementById("speed");
 let machine = null;
 let program = "diff";
 let wide = false;
-let cellCode = 79;      // знак клетки стакана; 79 — полый квадрат
+// Знак клетки: null — тот самый квадрат, дорисованный в знакогенераторе
+// (128 и 129 половинками в узком формате, 127 целиком в широком). Щелчок по
+// таблице знаков заменяет его любым знаком из ПЗУ машины.
+let cellCode = null;
 let inputLine = "";
 let lastCounters = [0, 0];
 let cursorOn = true;
@@ -2322,16 +2582,73 @@ function sourceFor(name) {
   // Ширина клетки — единственная строка, которой отличается широкий режим:
   // на машине формат экрана переключается меню УСТ, а программа только
   // узнаёт из CW%, сколько знаков занимает одна клетка стакана.
-  return SOURCES[name]
+  let src = SOURCES[name]
     .replace(/^105 CW%=\d+$/m, "105 CW%=" + (wide ? 1 : 2))
-    .replace(/^(\d+) CB\$=.*$/m, "$1 CB$=CHR$(" + cellCode + ")+\" \"")
-    .replace(/^(\d+) IF CW%=1 THEN CB\$=.*$/m, "$1 IF CW%=1 THEN CB$=CHR$(" + cellCode + ")")
     // Стены, пол и углы — один сплошной знак: на машине его надо сперва
     // нарисовать редактором шрифта, здесь он уже есть.
     .replace(/CHR\$\(164\)/g, "CHR$(143)")
     .replace(/CHR\$\(186\)/g, "CHR$(143)")
     .replace(/CHR\$\(166\)/g, "CHR$(143)")
     .replace(/CHR\$\(161\)/g, "CHR$(143)");
+  if (cellCode !== null) {
+    src = src
+      .replace(/^(\d+) CB\$=.*$/m, "$1 CB$=CHR$(" + cellCode + ")+\" \"")
+      .replace(/^(\d+) IF CW%=1 THEN CB\$=.*$/m, "$1 IF CW%=1 THEN CB$=CHR$(" + cellCode + ")");
+  }
+  return withRecords(src);
+}
+
+/* ------------------------------------------------------- таблица рекордов */
+/* Игра держит рекорды строками DATA, и дальше памяти машины они не живут: на
+   школьном УКНЦ сохранить их можно было только на дискету головного ПК, и то
+   через учителя. Роль головного ПК тут играет сама страница — таблицу она
+   держит в браузере и вписывает обратно в те же строки DATA. */
+const RECORDS_KEY = "uknc-tetris-records";
+const RECORD_ROWS = 5;
+let savedRecords = "";
+
+function loadRecords() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(RECORDS_KEY) || "null");
+    if (!Array.isArray(rows) || rows.length !== RECORD_ROWS) return null;
+    return rows.map((r) => [String(r[0] || "?").slice(0, 8), Math.round(Number(r[1]) || 0)]);
+  } catch (err) {
+    return null;                     // приватное окно или чужие данные в ключе
+  }
+}
+
+function withRecords(src) {
+  const rows = loadRecords();
+  if (!rows) return src;
+  let i = 0;
+  // Строки рекордов — единственные DATA с именем в кавычках.
+  return src.replace(/^(\d+) DATA "[^"]*",\d+$/gm, (line, number) => {
+    if (i >= rows.length) return line;
+    const row = rows[i++];
+    return number + ' DATA "' + row[0] + '",' + row[1];
+  });
+}
+
+function machineRecords() {
+  const rows = [];
+  for (let i = 0; i < RECORD_ROWS; i++) {
+    const name = machine.getArray("HS$", [i]);
+    const points = machine.getArray("HP", [i]);
+    if (typeof name !== "string" || !name.length) return null;
+    rows.push([name, Math.round(points)]);
+  }
+  return rows;
+}
+
+function keepRecords() {
+  const rows = machineRecords();
+  if (!rows) return;
+  const text = JSON.stringify(rows);
+  if (text === savedRecords) return;
+  savedRecords = text;
+  try {
+    localStorage.setItem(RECORDS_KEY, text);
+  } catch (err) { /* приватное окно: рекорды живут только до перезагрузки */ }
 }
 
 function boot() {
@@ -2370,33 +2687,62 @@ function updateCounters(force) {
 /* --------------------------------------------------- клетки живой фигуры */
 /* Игра держит текущую фигуру в CT/CR/CX/CY и таблицах SX/TY — по ним видно,
    какие знакоместа сейчас «живые». Прилипшие клетки этим набором не покрыты,
-   поэтому и рисуются тусклее. */
+   поэтому и рисуются тусклее.
+   Две тонкости, из-за которых набор нельзя брать в любой момент:
+   1. Проверяя, можно ли двинуться или повернуться, игра сдвигает CX/CY, зовёт
+      проверку столкновений и возвращает их назад. Кадр, пойманный в середине
+      этой проверки, показал бы фигуру за стеной или ниже дна — оттого стена и
+      дно вспыхивали белым, когда фигуру упирали в край.
+   2. Экран за такую проверку не меняется вовсе, поэтому набор пересчитывается
+      только после настоящего вывода на экран, а между ними держится прежний.
+   Плюс страховка от того же по смыслу: клетки за пределами стакана в набор не
+   попадают, что бы ни лежало в переменных. */
+let activeSet = new Set();
+let activeSeq = -1;
+
 function activeCells() {
+  if (machine.screen.writes === activeSeq) return activeSet;
+  activeSeq = machine.screen.writes;
   const set = new Set();
   try {
     const t = machine.getVar("CT%");
-    if (!t || t < 1 || t > 7) return set;
-    if (!machine.running) return set;
+    if (!t || t < 1 || t > 7 || !machine.running) { activeSet = set; return set; }
     const r = machine.getVar("CR%"), x = machine.getVar("CX%"), y = machine.getVar("CY%");
     const bx = machine.getVar("BX%"), by = machine.getVar("BY%"), cw = machine.getVar("CW%") || 2;
+    const bw = machine.getVar("BW%"), bh = machine.getVar("BH%");
     const si = (t - 1) * 4 + r;
     for (let i = 0; i < 4; i++) {
-      const col = bx + (x + machine.getArray("SX%", [si, i])) * cw;
-      const row = by + y + machine.getArray("TY%", [si, i]);
+      const cellX = x + machine.getArray("SX%", [si, i]);
+      const cellY = y + machine.getArray("TY%", [si, i]);
+      if (cellX < 0 || cellX >= bw || cellY < 0 || cellY >= bh) continue;
+      const col = bx + cellX * cw, row = by + cellY;
       if (row < 0 || row >= ROWS) continue;
       for (let k = 0; k < cw; k++) {
         if (col + k >= 0 && col + k < COLS) set.add(row * COLS + col + k);
       }
     }
   } catch (err) { /* до первой фигуры переменных ещё нет */ }
+  activeSet = set;
   return set;
 }
 
 /* ------------------------------------------------------------- отрисовка */
+/* Знакоместо на экране УКНЦ вдвое выше своей ширины: 640x288 точек растянуты на
+   экран 4:3, поэтому точка не квадратная. Картинка кадра считается в точках
+   машины (8 на 11), а вытягивается по вертикали уже разметкой — тогда клетка
+   стакана из двух знаков выходит квадратной, как на живой машине. */
+const CELL_ASPECT = 2;
+function setScreenShape(cols, cw) {
+  canvas.style.aspectRatio = (cols * cw) + " / " + (ROWS * CW * CELL_ASPECT);
+}
+
 function draw() {
   const cw = wide ? CW * 2 : CW;
   const cols = wide ? 40 : COLS;
-  if (canvas.width !== cols * cw) canvas.width = cols * cw;
+  if (canvas.width !== cols * cw) {
+    canvas.width = cols * cw;
+    setScreenShape(cols, cw);
+  }
   const img = ctx.createImageData(cols * cw, ROWS * CHH);
   const px = img.data;
   const bg = [11, 12, 12];
@@ -2405,8 +2751,11 @@ function draw() {
   const inkFrame = [120, 132, 136];
   const inkLocked = [168, 180, 183];
   const inkActive = [255, 255, 255];
-  const blockChar = machine.getVar("CB$");
-  const blockCode = blockChar && blockChar.length ? koi7(blockChar[0]) : -1;
+  // Клетка стакана — одна или две разные половины квадрата, и обе должны
+  // светиться как клетка, а не как рамка.
+  const blockChar = machine.getVar("CB$") || "";
+  const blockCodes = new Set();
+  for (const ch of blockChar) if (ch !== " ") blockCodes.add(koi7(ch));
   const active = activeCells();
   for (let i = 0; i < px.length; i += 4) {
     px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; px[i + 3] = 255;
@@ -2417,12 +2766,19 @@ function draw() {
       const idx = row * COLS + col;
       const code = machine.screen.cells[idx];
       if (code === 32) continue;
-      const ink = active.has(idx) ? inkActive : (code === blockCode ? inkLocked : inkFrame);
-      if (code === SOLID) {
+      const ink = active.has(idx) ? inkActive : (blockCodes.has(code) ? inkLocked : inkFrame);
+      const tall = TALL.get(code);
+      if (tall) {
         for (let dy = 0; dy < CHH; dy++) {
-          for (let dx = 0; dx < cw; dx++) {
-            const o = (((row * CHH + dy) * width) + col * cw + dx) * 4;
-            px[o] = ink[0]; px[o + 1] = ink[1]; px[o + 2] = ink[2];
+          const bits = tall[dy];
+          if (!bits) continue;
+          for (let dx = 0; dx < 8; dx++) {
+            if (!(bits & (0x80 >> dx))) continue;
+            const step = wide ? 2 : 1;
+            for (let k = 0; k < step; k++) {
+              const o = (((row * CHH + dy) * width) + col * cw + dx * step + k) * 4;
+              px[o] = ink[0]; px[o + 1] = ink[1]; px[o + 2] = ink[2];
+            }
           }
         }
         continue;
@@ -2459,6 +2815,25 @@ function draw() {
 /* --------------------------------------------------- таблица знаков машины */
 const charset = document.getElementById("charset");
 const charsetMsg = document.getElementById("charset-msg");
+const charsetReset = document.getElementById("charset-reset");
+const recordsClear = document.getElementById("records-clear");
+
+charsetReset.addEventListener("click", () => {
+  cellCode = null;
+  drawCharset();
+  charsetMsg.textContent = "Клетка стакана — дорисованный квадрат: знаки 128 и 129. Наберите RUN.";
+  charsetReset.hidden = true;
+  boot();
+});
+
+recordsClear.addEventListener("click", () => {
+  try {
+    localStorage.removeItem(RECORDS_KEY);
+  } catch (err) { /* приватное окно: стирать нечего */ }
+  savedRecords = "";
+  boot();
+  say("Таблица рекордов стёрта, в программе снова исходные строки DATA.");
+});
 const CHAR_SCALE = 3, CHAR_STEP = 8 * CHAR_SCALE + 2, CHAR_COLS = 16, CHAR_ROWS = 14;
 
 function drawCharset() {
@@ -2501,6 +2876,7 @@ charset.addEventListener("click", (e) => {
   cellCode = code;
   drawCharset();
   charsetMsg.textContent = "Клетка стакана — знак " + code + ". Программа перезаписана, наберите RUN.";
+  charsetReset.hidden = false;
   boot();
 });
 
@@ -2510,6 +2886,7 @@ function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
   cursorOn = Math.floor(now / 400) % 2 === 0;
+  keepRecords();
   if (machine.running) {
     const budget = Math.max(1, Math.round(parseInt(speedEl.value, 10) * dt));
     try {
@@ -2696,6 +3073,7 @@ for (const radio of document.querySelectorAll('input[name="prog"]')) {
   });
 }
 
+setScreenShape(COLS, CW);
 boot();
 drawCharset();
 requestAnimationFrame(frame);

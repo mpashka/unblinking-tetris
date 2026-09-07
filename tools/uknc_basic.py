@@ -29,7 +29,7 @@ KEYWORDS = {
     "COLOR", "CLS", "LOCATE", "BEEP", "ON", "AND", "OR", "NOT",
 }
 
-FUNCTIONS = {"INT", "ABS", "RND", "SGN", "ASC", "LEN", "SQR", "CHR", "STRING"}
+FUNCTIONS = {"INT", "ABS", "RND", "SGN", "ASC", "LEN", "SQR", "CHR", "STRING", "MID", "VAL"}
 
 SCREEN_COLS = 64
 SCREEN_ROWS = 24
@@ -273,7 +273,8 @@ class Interpreter:
         total = 1
         for s in sizes:
             total *= s + 1
-        self.arrays[key] = {"dims": sizes, "data": [0] * total}
+        empty = "" if key.endswith("$") else 0
+        self.arrays[key] = {"dims": sizes, "data": [empty] * total}
 
     def _array(self, name):
         key = self.canon(name)
@@ -453,6 +454,19 @@ class Interpreter:
             return chr(int(args[0])), i
         if base == "STRING":
             return str(args[1]) * int(args[0]), i
+        if base == "MID":
+            # MID$ есть, а LEFT$ и SEG$ эта система не знает - проверено на
+            # машине: PRINT LEFT$("ABCDE",3) отвечает ошибкой 13.
+            start = int(args[1])
+            if start < 1:
+                raise BasicError(f"MID$: начало {start} меньше единицы")
+            length = int(args[2]) if len(args) > 2 else len(args[0])
+            return args[0][start - 1:start - 1 + length], i
+        if base == "VAL":
+            try:
+                return float(args[0]), i
+            except ValueError:
+                return 0.0, i
         raise BasicError(f"нет функции {base}")
 
     def _index_list_raw(self, toks, i):

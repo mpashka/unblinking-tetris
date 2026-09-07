@@ -568,6 +568,91 @@ def t_ui_smoke():
     assert b.screen.ops, "экран пуст"
 
 
+@test("уровень выбирается той же клавишей, что запускает игру")
+def t_level_choice():
+    for key, level in ((" ", 0), ("0", 0), ("5", 5), ("9", 9), ("A", 0)):
+        b = Interpreter(SOURCE, seed=3)
+        b.keys.append(key)
+        b.run(start_line=CONFIG, stop_at={MAIN_LOOP})
+        assert b.get_var("SL%") == level, f"клавиша {key!r}: SL%={b.get_var('SL%')}"
+        assert b.get_var("LV%") == level, f"клавиша {key!r}: LV%={b.get_var('LV%')}"
+        assert b.get_var("GT%") == b.get_array("GD%", [level]), "скорость не от выбранного уровня"
+
+
+@test("таблица рекордов: имя спрашивается только у того, кто в неё попал")
+def t_records():
+    b = boot()
+    names = [b.get_array("HS$", [i]) for i in range(5)]
+    points = [b.get_array("HP", [i]) for i in range(5)]
+    assert points == sorted(points, reverse=True), f"таблица не отсортирована: {points}"
+
+    # мимо таблицы: имя не спрашивают, строки не двигаются
+    b.set_var("SR", points[4] - 1)
+    b.call(7400)
+    assert b.get_var("HI%") == -1, "проигравший попал в таблицу"
+    assert [b.get_array("HS$", [i]) for i in range(5)] == names
+
+    # в середину таблицы: нижние строки сдвигаются вниз, последняя выпадает
+    b.set_var("SR", (points[1] + points[2]) / 2)
+    b.keys.extend(list("PASHA") + [chr(13)])
+    b.call(7400)
+    assert b.get_var("HI%") == 2, f"строка {b.get_var('HI%')}"
+    assert b.get_array("HS$", [2]) == "PASHA"
+    assert b.get_array("HS$", [3]) == names[2] and b.get_array("HS$", [4]) == names[3]
+    assert b.get_array("HP", [2]) == b.get_var("SR")
+
+    # первое место
+    b.set_var("SR", points[0] + 10)
+    b.keys.extend(list("IRA") + [chr(13)])
+    b.call(7400)
+    assert b.get_var("HI%") == 0 and b.get_array("HS$", [0]) == "IRA"
+    assert b.get_array("HS$", [1]) == names[0]
+
+
+@test("ввод имени: восемь знаков, забой, стрелки не набираются")
+def t_name_entry():
+    b = boot()
+    b.keys.extend(list("ABCDEFGHIJ") + [chr(13)])
+    b.call(7450)
+    assert b.get_var("HN$") == "ABCDEFGH", b.get_var("HN$")
+
+    b.keys.extend(["A", "B", chr(8), "C", chr(13)])
+    b.call(7450)
+    assert b.get_var("HN$") == "AC", b.get_var("HN$")
+
+    # стрелка приходит как ESC и буква: буква не должна попасть в имя
+    b.keys.extend([chr(27), "C", "X", chr(13)])
+    b.call(7450)
+    assert b.get_var("HN$") == "X", b.get_var("HN$")
+
+    # пробел не набирается: это клавиша сброса, и её нажатия из последних
+    # секунд партии иначе забили бы имя пробелами (поймано на живой машине)
+    b.keys.extend([" ", " ", "X", " ", chr(13)])
+    b.call(7450)
+    assert b.get_var("HN$") == "X", b.get_var("HN$")
+
+    # пустое имя всё равно попадает в таблицу, но заметным
+    b.keys.extend([chr(13)])
+    b.call(7450)
+    assert b.get_var("HN$") == "?", b.get_var("HN$")
+
+
+@test("рекорды видны на заставке, новая строка помечена")
+def t_records_on_title():
+    b = Interpreter(SOURCE, seed=3)
+    b.keys.append(" ")
+    b.run(start_line=CONFIG, stop_at={MAIN_LOOP})
+    b.set_var("HI%", 1)
+    b.screen.cls()
+    b.call(7500)
+    text = b.screen.dump()
+    for i in range(5):
+        assert b.get_array("HS$", [i]) in text, f"строка {i} не напечатана"
+    marks = [row for row in range(24) if b.screen.char_at(22, row) == ">"]
+    assert marks == [10], f"пометка стоит в строках {marks}"
+    assert b.screen.text_at(23, 10, 3) == b.get_array("HS$", [1])[:3]
+
+
 @test("клавиши: WASD, раскладка БК 7/9/8/5 и стрелки как ESC плюс буква")
 def t_keys():
     b = boot()
