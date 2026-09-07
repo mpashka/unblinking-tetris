@@ -1,0 +1,7 @@
+# Загрузиться с дискеты (пункт «1 — диск» в меню).
+frames 150
+key 1
+frames 30
+key ENTER
+frames 900
+shot disk-boot.ppm
