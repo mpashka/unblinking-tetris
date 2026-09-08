@@ -2339,8 +2339,12 @@ class Basic {
     const toks = this.lines[li].tokens;
     if (ti >= toks.length) { this.pc = [li + 1, 0]; return true; }
     this.steps++;
+    const printed = this.screen.writes;
     try {
       this.exec(toks, ti, li);
+      // Клетки живой фигуры снимаются в тот момент, когда программа что-то
+      // напечатала: только тогда переменные фигуры означают то, что на экране.
+      if (this.onPrint && this.screen.writes !== printed) this.onPrint();
     } catch (err) {
       if (err instanceof BasicError) {
         err.line = this.lines[li].number;
@@ -2653,6 +2657,8 @@ function keepRecords() {
 
 function boot() {
   machine = new Basic(sourceFor(program));
+  machine.onPrint = takeActiveCells;
+  activeSet = new Set();
   listing.value = sourceFor(program);
   for (const line of BANNER) { machine.screen.write(line); machine.screen.newline(); }
   prompt();
@@ -2688,25 +2694,22 @@ function updateCounters(force) {
 /* Игра держит текущую фигуру в CT/CR/CX/CY и таблицах SX/TY — по ним видно,
    какие знакоместа сейчас «живые». Прилипшие клетки этим набором не покрыты,
    поэтому и рисуются тусклее.
-   Две тонкости, из-за которых набор нельзя брать в любой момент:
-   1. Проверяя, можно ли двинуться или повернуться, игра сдвигает CX/CY, зовёт
-      проверку столкновений и возвращает их назад. Кадр, пойманный в середине
-      этой проверки, показал бы фигуру за стеной или ниже дна — оттого стена и
-      дно вспыхивали белым, когда фигуру упирали в край.
-   2. Экран за такую проверку не меняется вовсе, поэтому набор пересчитывается
-      только после настоящего вывода на экран, а между ними держится прежний.
-   Плюс страховка от того же по смыслу: клетки за пределами стакана в набор не
-   попадают, что бы ни лежало в переменных. */
+   🚨 Набор снимается ровно в тот момент, когда программа что-то напечатала
+   (машина зовёт onPrint), и держится до следующей печати. Иначе он врёт:
+   проверяя, можно ли двинуться или повернуться, игра сдвигает CX/CY, зовёт
+   проверку столкновений и возвращает их назад, а на экране за это время не
+   меняется ничего. Кадр, пойманный внутри такой проверки, подсвечивал фигуру
+   не там, где она есть: у стены — саму стену, у пола — пол, а после сброса,
+   когда фигура лежит и проверка идёт каждый ход, — её силуэт клеткой ниже.
+   Заодно страховка по смыслу: клетки за пределами стакана в набор не попадают,
+   что бы ни лежало в переменных. */
 let activeSet = new Set();
-let activeSeq = -1;
 
-function activeCells() {
-  if (machine.screen.writes === activeSeq) return activeSet;
-  activeSeq = machine.screen.writes;
+function takeActiveCells() {
   const set = new Set();
   try {
     const t = machine.getVar("CT%");
-    if (!t || t < 1 || t > 7 || !machine.running) { activeSet = set; return set; }
+    if (!t || t < 1 || t > 7 || !machine.running) { activeSet = set; return; }
     const r = machine.getVar("CR%"), x = machine.getVar("CX%"), y = machine.getVar("CY%");
     const bx = machine.getVar("BX%"), by = machine.getVar("BY%"), cw = machine.getVar("CW%") || 2;
     const bw = machine.getVar("BW%"), bh = machine.getVar("BH%");
@@ -2723,7 +2726,6 @@ function activeCells() {
     }
   } catch (err) { /* до первой фигуры переменных ещё нет */ }
   activeSet = set;
-  return set;
 }
 
 /* ------------------------------------------------------------- отрисовка */
@@ -2751,12 +2753,17 @@ function draw() {
   const inkFrame = [120, 132, 136];
   const inkLocked = [168, 180, 183];
   const inkActive = [255, 255, 255];
+  // У клетки фигуры подсвечена не только рамка, но и середина: знакоместо
+  // заливается своим фоном, и клетка читается как тело фигуры, а не как
+  // контур на пустоте. Пустота стакана остаётся чёрной.
+  const fillLocked = [38, 46, 49];
+  const fillActive = [62, 82, 92];
   // Клетка стакана — одна или две разные половины квадрата, и обе должны
   // светиться как клетка, а не как рамка.
   const blockChar = machine.getVar("CB$") || "";
   const blockCodes = new Set();
   for (const ch of blockChar) if (ch !== " ") blockCodes.add(koi7(ch));
-  const active = activeCells();
+  const active = activeSet;
   for (let i = 0; i < px.length; i += 4) {
     px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; px[i + 3] = 255;
   }
@@ -2766,8 +2773,22 @@ function draw() {
       const idx = row * COLS + col;
       const code = machine.screen.cells[idx];
       if (code === 32) continue;
-      const ink = active.has(idx) ? inkActive : (blockCodes.has(code) ? inkLocked : inkFrame);
+      // Клетка светится живой, только если она и правда занята знаком фигуры:
+      // внутри отрисовки разницей набор уже указывает на новое место, а знаки
+      // туда ещё не напечатаны, и подсвечивать там нечего.
+      const block = blockCodes.has(code);
+      const live = block && active.has(idx);
+      const ink = live ? inkActive : (block ? inkLocked : inkFrame);
       const tall = TALL.get(code);
+      if (block && code !== SOLID) {
+        const fill = live ? fillActive : fillLocked;
+        for (let dy = 0; dy < CHH; dy++) {
+          for (let dx = 0; dx < cw; dx++) {
+            const o = (((row * CHH + dy) * width) + col * cw + dx) * 4;
+            px[o] = fill[0]; px[o + 1] = fill[1]; px[o + 2] = fill[2];
+          }
+        }
+      }
       if (tall) {
         for (let dy = 0; dy < CHH; dy++) {
           const bits = tall[dy];
@@ -3035,6 +3056,8 @@ document.getElementById("load").addEventListener("click", () => {
   try {
     const fresh = new Basic(listing.value);
     machine = fresh;
+    machine.onPrint = takeActiveCells;
+    activeSet = new Set();
     machine.screen.cls();
     machine.screen.write("ПРОГРАММА ЗАПИСАНА, СТРОК " + machine.lines.length);
     machine.screen.newline();
