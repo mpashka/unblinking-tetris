@@ -11,8 +11,9 @@
     python3 tools/build_web.py            собрать web/tetris-uknc.html
 """
 
-import json
+import datetime
 import pathlib
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -34,20 +35,34 @@ SKELETON = """<!doctype html>
 {body}</body>
 </html>
 """
-FONT = ROOT / "tools" / "uknc" / "font.json"
+FONT_HEX = ROOT / "tools" / "uknc" / "font.hex"
 FONT_SHOT = ROOT / "build" / "uknc" / "font.ppm"
 
 
 def font_hex():
-    """224 знака по восемь строк развёртки, строка — байт."""
+    """224 знака по восемь строк развёртки, строка — байт.
+
+    Обычно берётся готовый `tools/uknc/font.hex`: он в репозитории, поэтому
+    страница собирается на чистой копии, без эмулятора. Снимок экрана машины
+    старше файла — из него шрифт пересобирается, и файл переписывается.
+    """
+    if FONT_SHOT.exists():
+        text = font_from_shot()
+        if not FONT_HEX.exists() or FONT_HEX.read_text().strip() != text:
+            FONT_HEX.write_text(text + "\n")
+        return text
+    if FONT_HEX.exists():
+        return FONT_HEX.read_text().strip()
+    raise SystemExit(
+        f"нет ни {FONT_HEX}, ни снимка шрифта {FONT_SHOT}: снимите его "
+        f"эмулятором (tools/uknc/README.md) или верните файл из репозитория"
+    )
+
+
+def font_from_shot():
     sys.path.insert(0, str(ROOT / "tools" / "uknc"))
     import screen_text as st
 
-    if not FONT_SHOT.exists():
-        raise SystemExit(
-            f"нет снимка шрифта {FONT_SHOT}: снимите его эмулятором "
-            f"(tools/uknc/README или docs/UKNC_BASIC_NOTES.md)"
-        )
     width, _height, pix = st.read_ppm(FONT_SHOT)
     layout = [(2, 32, 95), (3, 96, 127), (4, 128, 191), (5, 192, 255)]
     bits = {}
@@ -61,6 +76,20 @@ def font_hex():
     return "".join(out)
 
 
+def build_stamp():
+    """Метка сборки для отчёта об ошибке: по ней видно, какую страницу смотрел человек."""
+    date = datetime.date.today().isoformat()
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(ROOT), "describe", "--always", "--dirty", "--abbrev=8"],
+            capture_output=True, text=True, timeout=10,
+        )
+        commit = out.stdout.strip() or "без git"
+    except (OSError, subprocess.SubprocessError):
+        commit = "без git"
+    return f"{date} {commit}"
+
+
 def main():
     for name in ("TETRIS.BAS", "TETRISC.BAS"):
         if not (ROOT / "src" / name).exists():
@@ -69,6 +98,7 @@ def main():
     page = page.replace("@@PROG_DIFF@@", (ROOT / "src" / "TETRIS.BAS").read_text().rstrip())
     page = page.replace("@@PROG_CLASSIC@@", (ROOT / "src" / "TETRISC.BAS").read_text().rstrip())
     page = page.replace("@@FONT@@", font_hex())
+    page = page.replace("@@BUILD@@", build_stamp())
     OUT.write_text(page)
 
     # Разделение простое: <title>, <link> и <style> — это голова, остальное тело.

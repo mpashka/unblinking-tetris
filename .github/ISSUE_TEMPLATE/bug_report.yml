@@ -1,0 +1,45 @@
+name: Ошибка
+description: Что-то работает не так — в игре или на странице
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Быстрее всего — кнопка **«Сообщить об ошибке»** на самой странице
+        (<https://tetris.gestalt.pasha-home.ru>): она заполняет состояние страницы сама
+        и кладёт снимок экрана в буфер обмена. Эта форма — на случай, когда страницы под
+        рукой нет.
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Опишите, что видно на экране, и приложите снимок — Ctrl+V вставляет его прямо сюда.
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что должно было произойти
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как повторить
+      placeholder: |
+        1. Запустил немигающую версию, уровень 3
+        2. Сбросил фигуру пробелом
+        3. Двинул влево
+    validations: { required: true }
+  - type: textarea
+    id: state
+    attributes:
+      label: Состояние страницы
+      description: Блок из кнопки «Сообщить об ошибке» — версия сборки, режим, счётчики, последние клавиши, браузер.
+      render: text
+  - type: dropdown
+    id: where
+    attributes:
+      label: Где это было
+      options:
+        - страница в браузере
+        - настоящий эмулятор УКНЦ (UKNCBTL)
+        - живая машина
+        - стенд без машины (tools/test_tetris.py)

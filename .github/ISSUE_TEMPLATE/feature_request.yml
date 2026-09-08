@@ -1,0 +1,30 @@
+name: Хотелось бы
+description: Предложить возможность или изменение
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Игра держится в рамках штатного Бейсика УКНЦ 1988 года: без графики, один оператор
+        в строке, две значимые буквы в имени. Предложение, которое туда не влезает, тоже
+        интересно — но его придётся делать страницей, а не игрой.
+  - type: textarea
+    id: what
+    attributes:
+      label: Что хочется
+    validations: { required: true }
+  - type: textarea
+    id: why
+    attributes:
+      label: Зачем, какой сценарий это закрывает
+      description: Что человек делает сейчас и во сколько шагов, и как будет после.
+    validations: { required: true }
+  - type: dropdown
+    id: side
+    attributes:
+      label: Чего это касается
+      options:
+        - игры на Бейсике
+        - страницы в браузере
+        - стенда и проверок
+        - документации

@@ -272,6 +272,32 @@
 
   hr { border: none; border-top: 1px solid var(--line); margin: 0; }
 
+  .colophon { display: flex; flex-direction: column; gap: 10px; }
+  .colophon p { margin: 0; font-size: 14.5px; color: var(--muted); }
+  .colophon a { color: var(--accent); }
+  #report-preview {
+    margin: 10px 0;
+    padding: 10px 12px;
+    max-height: 320px;
+    overflow: auto;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    color: var(--text);
+    background: var(--ground);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+  }
+  #report-shot {
+    display: block;
+    width: 100%;
+    max-width: 512px;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    background: var(--screen-bg);
+  }
+
   .msg {
     font-size: 13px;
     color: var(--muted);
@@ -430,6 +456,27 @@
         секунду.</p>
     </section>
   </div>
+
+  <hr>
+
+  <footer class="colophon">
+    <p>Исходники игры, стенд и разбор машины — <a id="repo-link" href="#">на GitHub</a>,
+      описание проекта со снимками — <a id="wiki-link" href="#">в вики</a>.</p>
+    <div class="row">
+      <button id="report-bug">Сообщить об ошибке</button>
+      <button id="report-idea">Предложить возможность</button>
+    </div>
+    <p class="msg" id="report-msg">Кнопка кладёт снимок экрана в буфер обмена и открывает форму
+      на GitHub с уже вписанным состоянием страницы. Само оно никуда не уходит, пока вы не
+      нажмёте там «Create».</p>
+    <details id="report-details">
+      <summary>Что попадёт в отчёт</summary>
+      <pre id="report-preview"></pre>
+      <p class="msg">Снимок экрана — вот этот; если он не попал в буфер, скопируйте картинку
+        правой кнопкой.</p>
+      <img id="report-shot" alt="Снимок экрана машины">
+    </details>
+  </footer>
 </div>
 
 <script type="text/plain" id="src-diff">1 REM ***************************************************************
@@ -2553,6 +2600,9 @@ const drawnEl = document.getElementById("drawn");
 const erasedEl = document.getElementById("erased");
 const lastMoveEl = document.getElementById("last-move");
 const speedEl = document.getElementById("speed");
+const previewEl = document.getElementById("report-preview");
+const shotEl = document.getElementById("report-shot");
+const detailsEl = document.getElementById("report-details");
 
 let machine = null;
 let program = "diff";
@@ -2562,6 +2612,7 @@ let wide = false;
 // таблице знаков заменяет его любым знаком из ПЗУ машины.
 let cellCode = null;
 let inputLine = "";
+let lastError = "";
 let lastCounters = [0, 0];
 let cursorOn = true;
 
@@ -2895,6 +2946,94 @@ charset.addEventListener("click", (e) => {
   boot();
 });
 
+/* ------------------------------------------------------- отчёт об ошибке */
+/* Ошибку на такой странице почти невозможно описать словами: она зависит от
+   версии программы, формата экрана, скорости и того, что игрок нажимал. Поэтому
+   кнопка собирает всё это сама и открывает форму GitHub с уже вписанным
+   состоянием, а снимок экрана кладёт в буфер обмена — вставить одним Ctrl+V.
+   Наружу ничего не уходит до нажатия «Create» на самом GitHub. */
+const REPO = "https://github.com/mpashka/unblinking-tetris";
+const BUILD = "2026-09-08 577c50f4-dirty";
+const keyLog = [];
+
+function noteKey(name) {
+  keyLog.push(name === " " ? "пробел" : name);
+  if (keyLog.length > 24) keyLog.shift();
+}
+
+function reportText() {
+  const vars = ["LV%", "SR", "LN%", "CT%", "CR%", "CX%", "CY%", "GR%", "DC%", "EC%"];
+  const state = vars.map((n) => {
+    try { return n + "=" + machine.getVar(n); } catch (err) { return n + "=?"; }
+  }).join(" ");
+  const listingChanged = listing.value.trim() !== sourceFor(program).trim();
+  const line = [
+    "Страница: " + location.href,
+    "Сборка: " + BUILD,
+    "Программа: " + (program === "diff" ? "немигающая" : "мигающая") +
+      (listingChanged ? " (листинг правлен вручную)" : ""),
+    "Экран: " + (wide ? "40x24" : "80x24") + ", знак клетки: " +
+      (cellCode === null ? "квадрат 128/129/130" : cellCode),
+    "Скорость: " + speedEl.options[speedEl.selectedIndex].text,
+    "Машина: " + (machine.running ? "работает" : "остановлена") +
+      (lastError ? ", последняя ошибка — " + lastError : ""),
+    "Переменные: " + state,
+    "Последние клавиши: " + (keyLog.length ? keyLog.join(" ") : "—"),
+    "Браузер: " + navigator.userAgent,
+    "Окно: " + window.innerWidth + "x" + window.innerHeight +
+      " при dpr " + (window.devicePixelRatio || 1) +
+      ", тема " + (matchMedia("(prefers-color-scheme: dark)").matches ? "тёмная" : "светлая"),
+    "Время: " + new Date().toISOString(),
+  ];
+  return line.join("\n");
+}
+
+function shotBlob() {
+  // Синхронно, потому что и запись в буфер обязана случиться внутри щелчка.
+  const url = canvas.toDataURL("image/png");
+  shotEl.src = url;
+  const raw = atob(url.slice(url.indexOf(",") + 1));
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return new Blob([bytes], { type: "image/png" });
+}
+
+function openReport(kind) {
+  const report = reportText();
+  previewEl.textContent = report;
+  let copied = false;
+  try {
+    const item = new ClipboardItem({ "image/png": shotBlob() });
+    navigator.clipboard.write([item]).then(() => {
+      say("Снимок экрана в буфере обмена — вставьте его в форму через Ctrl+V.");
+    }, () => {
+      say("Снимок в буфер не пустили: он лежит ниже, в «что попадёт в отчёт».");
+      detailsEl.open = true;
+    });
+    copied = true;
+  } catch (err) {
+    shotBlob();
+    detailsEl.open = true;
+  }
+  if (!copied) say("Снимок экрана этот браузер копировать не даёт: он ниже, в «что попадёт в отчёт».");
+
+  const bug = kind === "bug";
+  const body = (bug
+    ? "### Что произошло\n\n\n\n### Что должно было произойти\n\n\n\n" +
+      "### Как повторить\n\n1. \n2. \n\n### Снимок экрана\n\n(вставьте из буфера: Ctrl+V)\n\n"
+    : "### Что хочется\n\n\n\n### Зачем, какой сценарий это закрывает\n\n\n\n") +
+    "### Состояние страницы\n\n```\n" + report + "\n```\n";
+  const url = REPO + "/issues/new?labels=" + (bug ? "bug" : "enhancement") +
+    "&title=" + encodeURIComponent(bug ? "Ошибка: " : "Хотелось бы: ") +
+    "&body=" + encodeURIComponent(body);
+  window.open(url, "_blank", "noopener");
+}
+
+document.getElementById("repo-link").href = REPO;
+document.getElementById("wiki-link").href = REPO + "/wiki";
+document.getElementById("report-bug").addEventListener("click", () => openReport("bug"));
+document.getElementById("report-idea").addEventListener("click", () => openReport("idea"));
+
 /* ------------------------------------------------------------- главный цикл */
 let last = performance.now();
 function frame(now) {
@@ -2912,7 +3051,8 @@ function frame(now) {
       machine.screen.write("ОШИБКА В СТРОКЕ " + (err.line || "?"));
       machine.screen.newline();
       prompt();
-      say(err.message + (err.line ? " (строка " + err.line + ")" : ""), "bad");
+      lastError = err.message + (err.line ? " (строка " + err.line + ")" : "");
+      say(lastError, "bad");
       setLamp("idle");
     }
     if (!machine.running) { prompt(); setLamp("idle"); }
@@ -2929,11 +3069,12 @@ canvas.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (machine.running) {
     if (ARROWS[e.key]) {
+      noteKey(e.key);
       machine.keys.push("\x1b", ARROWS[e.key]);
       e.preventDefault();
       return;
     }
-    if (e.key.length === 1) { machine.keys.push(e.key.toUpperCase()); e.preventDefault(); }
+    if (e.key.length === 1) { noteKey(e.key); machine.keys.push(e.key.toUpperCase()); e.preventDefault(); }
     if (e.key === "Escape") { machine.running = false; prompt(); setLamp("idle"); e.preventDefault(); }
     return;
   }
@@ -2991,7 +3132,8 @@ function submitLine() {
     machine.screen.write("ОШИБКА");
     machine.screen.newline();
     prompt();
-    say(err.message, "bad");
+    lastError = err.message;
+    say(lastError, "bad");
   }
 }
 
@@ -3059,7 +3201,8 @@ document.getElementById("load").addEventListener("click", () => {
     setLamp("idle");
     say("Записано строк: " + machine.lines.length + ". Наберите RUN.");
   } catch (err) {
-    say(err.message, "bad");
+    lastError = err.message;
+    say(lastError, "bad");
   }
 });
 
